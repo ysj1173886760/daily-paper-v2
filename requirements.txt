@@ -1,1 +1,7 @@
 pocketflow>=0.0.1
+pandas
+openai
+dspy
+arxiv
+PyPDF2
+tenacity
