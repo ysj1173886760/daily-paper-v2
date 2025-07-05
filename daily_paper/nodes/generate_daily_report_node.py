@@ -5,10 +5,10 @@ GenerateDailyReportNode - 生成日报节点
 import datetime
 import pandas as pd
 from pocketflow import Node
-from daily_paper.utils.data_manager import get_daily_papers as get_daily_papers_from_df
 from daily_paper.utils.feishu_client import send_daily_report_to_feishu
 from daily_paper.utils.call_llm import call_llm
 from daily_paper.utils.logger import logger
+from daily_paper.utils.data_manager import get_daily_papers
 
 
 def generate_daily_summary(combined_text):

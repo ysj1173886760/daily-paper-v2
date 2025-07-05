@@ -5,25 +5,10 @@ ArXiv API Client
 """
 
 import arxiv
-import datetime
-import logging
-from typing import Dict, TypedDict, Optional
+from daily_paper.utils.logger import logger
+from daily_paper.model.arxiv_paper import ArxivPaper
 
 ARXIV_URL = "http://arxiv.org/"
-
-
-class ArxivPaper(TypedDict):
-    paper_id: str
-    paper_title: str
-    paper_url: str
-    paper_abstract: str
-    paper_authors: str
-    paper_first_author: str
-    primary_category: str
-    publish_time: datetime.date
-    update_time: datetime.date
-    comments: Optional[str]
-
 
 def get_authors(authors, first_author=False):
     """提取作者信息"""
@@ -32,7 +17,7 @@ def get_authors(authors, first_author=False):
     return ", ".join(str(author) for author in authors)
 
 
-def get_daily_papers(query: str, max_results: int) -> Dict[str, ArxivPaper]:
+def get_daily_papers(query: str, max_results: int) -> dict[str, ArxivPaper]:
     """
     从arXiv获取论文数据
 
@@ -60,7 +45,7 @@ def get_daily_papers(query: str, max_results: int) -> Dict[str, ArxivPaper]:
         update_time = result.updated.date()
         comments = result.comment
 
-        logging.info(
+        logger.debug(
             f"Time = {update_time} title = {paper_title} author = {paper_first_author}"
         )
 
