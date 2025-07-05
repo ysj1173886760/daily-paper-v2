@@ -1,7 +1,6 @@
 import logging
 import argparse
 from daily_paper.flow import run_rag_papers, run_kg_papers
-from daily_paper.utils.call_llm import setup_dspy_lm
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -13,10 +12,6 @@ def main():
     args = parser.parse_args()
 
     try:
-        # 设置dspy LM
-        lm = setup_dspy_lm()
-        logging.info("LM配置成功")
-        
         # 根据任务类型执行不同的流程
         if args.task == "rag":
             logging.info("开始执行RAG论文处理流程")

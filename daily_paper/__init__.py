@@ -5,4 +5,4 @@ Daily Paper Processing Module
 """
 
 from .nodes import *
-from .flow import * 
+from .flow import *

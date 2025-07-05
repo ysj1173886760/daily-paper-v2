@@ -13,9 +13,9 @@ from .generate_daily_report_node import GenerateDailyReportNode
 
 __all__ = [
     "FetchPapersNode",
-    "FilterExistingPapersNode", 
+    "FilterExistingPapersNode",
     "SavePapersNode",
     "ProcessPapersBatchNode",
     "PushToFeishuNode",
-    "GenerateDailyReportNode"
-] 
+    "GenerateDailyReportNode",
+]
