@@ -12,21 +12,7 @@ from .nodes import (
 from .utils.call_llm import setup_dspy_lm
 import logging
 
-def create_daily_paper_flow():
-    """
-    创建日报处理流程
-    
-    流程：
-    1. 获取论文数据 (FetchPapersNode)
-    2. 过滤已存在的论文 (FilterExistingPapersNode)
-    3. 保存新论文数据 (SavePapersNode)
-    4. 批量处理论文 (ProcessPapersBatchNode)
-    5. 推送论文到飞书 (PushToFeishuNode)
-    6. 生成并推送日报 (GenerateDailyReportNode)
-    
-    Returns:
-        配置好的Flow对象
-    """
+def create_daily_paper_flow() -> Flow:
     # 创建所有节点
     fetch_node = FetchPapersNode()
     filter_node = FilterExistingPapersNode()
@@ -122,7 +108,7 @@ def run_daily_paper_flow(query: str, max_results: int, meta_file: str):
         logging.info(f"新论文数: {len(shared.get('new_papers', {}))}")
         logging.info(f"处理摘要数: {len(shared.get('summaries', {}))}")
         logging.info(f"推送成功数: {len(shared.get('push_results', []))}")
-        logging.info(f"日报推送: {'成功' if shared.get('daily_report_sent') else '失败'}")
+        logging.info(f"日报推送: {'成功' if shared.get('daily_report_sent') else '失败/无日报'}")
         
         return shared
         
