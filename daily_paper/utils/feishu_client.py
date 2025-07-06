@@ -11,7 +11,12 @@ from typing import Dict, Any
 from tenacity import retry, wait_exponential, stop_after_attempt
 from .arxiv_client import ArxivPaper
 
-FEISHU_WEBHOOK_URL = os.getenv("FEISHU_WEBHOOK_URL")
+FEISHU_WEBHOOK_URL = None
+
+
+def init_feishu(feishu_webhook_url: str):
+    global FEISHU_WEBHOOK_URL
+    FEISHU_WEBHOOK_URL = feishu_webhook_url
 
 
 @retry(stop=stop_after_attempt(100), wait=wait_exponential(multiplier=1, min=1, max=10))

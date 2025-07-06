@@ -83,5 +83,7 @@ class PushToFeishuNode(Node):
         paper_manager.update_papers(update_dict)
         paper_manager.persist()
 
+        shared["push_results"] = success_paper_ids
+
         logger.info(f"成功推送{len(success_paper_ids)}篇论文")
         return "default"

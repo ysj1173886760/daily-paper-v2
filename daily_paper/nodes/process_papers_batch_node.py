@@ -72,8 +72,7 @@ class ProcessPapersBatchNode(BatchNode):
                 return paper.paper_id, "无法提取论文文本"
 
             # 生成摘要
-            # summary = summarize_paper(paper_text)
-            summary = " test"
+            summary = summarize_paper(paper_text)
             logger.info(f"已生成摘要: {paper.paper_id}")
 
             return paper.paper_id, summary
@@ -83,12 +82,6 @@ class ProcessPapersBatchNode(BatchNode):
             return paper.paper_id, f"处理失败: {str(e)}"
 
     def post(self, shared, prep_res, exec_res_list):
-        """更新论文摘要"""
-        if not exec_res_list:
-            logger.info("没有摘要需要更新")
-            return "default"
-
-        # 构建摘要字典
         update_dict = {}
         for paper_id, summary in exec_res_list:
             update_dict[paper_id] = {
@@ -96,13 +89,14 @@ class ProcessPapersBatchNode(BatchNode):
             }
 
         paper_manager: PaperMetaManager = shared.get("paper_manager")
-        print(paper_manager.df)
 
         # 更新DataFrame
         paper_manager.update_papers(update_dict)
 
         # 保存更新后的数据
         paper_manager.persist()
+
+        shared["summaries"] = exec_res_list
 
         logger.info(f"批量更新了{len(exec_res_list)}篇论文摘要")
         return "default"

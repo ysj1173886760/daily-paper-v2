@@ -25,12 +25,14 @@ class FilterExistingPapersNode(Node):
             return {}
 
         new_papers = paper_manager.filter_new_papers(raw_papers)
-        logger.info(f"过滤后剩余{len(new_papers)}篇新论文")
+        logger.info(f"过滤出{len(new_papers)}篇新论文（原有{len(raw_papers)}篇）")
         return new_papers
 
     def post(self, shared, prep_res, exec_res):
         """将过滤后的论文保存到共享存储"""
         paper_manager: PaperMetaManager = shared.get("paper_manager")
-        paper_manager.set_paper(list(exec_res.values()))
+        paper_manager.set_paper(exec_res)
+
+        shared["new_papers"] = exec_res
 
         return "default"

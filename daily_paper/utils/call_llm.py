@@ -2,9 +2,17 @@ import os
 from openai import OpenAI
 
 # 环境变量配置
-LLM_API_KEY = os.getenv("LLM_API_KEY")
-LLM_BASE_URL = os.getenv("LLM_BASE_URL")
-CHAT_MODEL_NAME = os.getenv("CHAT_MODEL_NAME", "gpt-4o")
+LLM_API_KEY = None
+LLM_BASE_URL = None
+CHAT_MODEL_NAME = None
+
+
+def init_llm(llm_base_url: str, llm_api_key: str, llm_model: str):
+    global LLM_BASE_URL, LLM_API_KEY, CHAT_MODEL_NAME
+    LLM_BASE_URL = llm_base_url
+    LLM_API_KEY = llm_api_key
+    CHAT_MODEL_NAME = llm_model
+
 
 # Learn more about calling the LLM: https://the-pocket.github.io/PocketFlow/utility_function/llm.html
 def call_llm(prompt) -> str:

@@ -11,13 +11,6 @@ from daily_paper.model.arxiv_paper import ArxivPaper
 ARXIV_URL = "http://arxiv.org/"
 
 
-def get_authors(authors, first_author=False):
-    """提取作者信息"""
-    if first_author:
-        return str(authors[0])
-    return ", ".join(str(author) for author in authors)
-
-
 def get_daily_papers(query: str, max_results: int) -> dict[str, ArxivPaper]:
     """
     从arXiv获取论文数据

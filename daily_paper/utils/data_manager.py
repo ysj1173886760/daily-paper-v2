@@ -42,7 +42,7 @@ class PaperMetaManager:
             logger.error(f"Error loading {self.meta_file}: {str(e)}")
             raise e
 
-    def filter_new_papers(self, papers: dict[str, ArxivPaper]) -> dict[str, ArxivPaper]:
+    def filter_new_papers(self, papers: list[ArxivPaper]) -> list[ArxivPaper]:
         """
         过滤出新论文（未存在于数据库中的论文）
 
@@ -53,8 +53,7 @@ class PaperMetaManager:
             过滤后的新论文字典
         """
         existing_ids = set(self.df["paper_id"].tolist())
-        new_papers = {k: v for k, v in papers.items() if v.paper_id not in existing_ids}
-        logger.info(f"过滤出{len(new_papers)}篇新论文（原有{len(papers)}篇）")
+        new_papers = [paper for paper in papers if paper.paper_id not in existing_ids]
         return new_papers
 
     def get_paper(self, paper_ids: list[str]) -> list[Optional[ArxivPaper]]:
