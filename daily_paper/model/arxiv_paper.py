@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 import datetime
 
+
 class ArxivPaper(BaseModel):
     paper_id: str
     paper_title: str

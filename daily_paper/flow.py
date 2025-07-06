@@ -1,37 +1,28 @@
-"""
-Daily Paper Processing Flow
-
-定义论文处理的完整流程
-"""
-
 from pocketflow import Flow
 from .nodes import (
     FetchPapersNode,
     FilterExistingPapersNode,
-    SavePapersNode,
     ProcessPapersBatchNode,
     PushToFeishuNode,
-    GenerateDailyReportNode,
 )
-import logging
+from daily_paper.utils.logger import logger
+from daily_paper.utils.data_manager import PaperMetaManager
 
 
 def create_daily_paper_flow() -> Flow:
     # 创建所有节点
     fetch_node = FetchPapersNode()
     filter_node = FilterExistingPapersNode()
-    save_node = SavePapersNode()
     process_node = ProcessPapersBatchNode()
     push_node = PushToFeishuNode()
-    report_node = GenerateDailyReportNode()
 
     # 连接节点形成流水线
-    fetch_node >> filter_node >> save_node >> process_node >> push_node >> report_node
+    fetch_node >> filter_node >> process_node >> push_node
 
     # 创建Flow对象
     flow = Flow(start=fetch_node)
 
-    logging.info("Daily Paper Processing Flow 创建完成")
+    logger.info("Daily Paper Processing Flow 创建完成")
     return flow
 
 
@@ -50,15 +41,8 @@ def run_daily_paper_flow(query: str, max_results: int, meta_file: str):
             "query_params": {
                 "query": query,
                 "max_results": max_results,
-                "meta_file": meta_file,
             },
-            "raw_papers": {},
-            "new_papers": {},
-            "processed_papers": None,
-            "summaries": {},
-            "push_results": [],
-            "daily_report": None,
-            "daily_report_sent": False,
+            "paper_manager": PaperMetaManager(meta_file),
         }
 
         # 创建并运行流程
@@ -66,24 +50,19 @@ def run_daily_paper_flow(query: str, max_results: int, meta_file: str):
         flow.run(shared)
 
         # 输出结果摘要
-        logging.info("=== 流程执行完成 ===")
-        logging.info(f"原始论文数: {len(shared.get('raw_papers', {}))}")
-        logging.info(f"新论文数: {len(shared.get('new_papers', {}))}")
-        logging.info(f"处理摘要数: {len(shared.get('summaries', {}))}")
-        logging.info(f"推送成功数: {len(shared.get('push_results', []))}")
-        logging.info(f"日报推送: {'成功' if shared.get('daily_report_sent') else '失败/无日报'}")
+        logger.info("=== 流程执行完成 ===")
 
         return shared
 
     except Exception as e:
-        logging.error(f"流程执行失败: {str(e)}")
+        logger.error(f"流程执行失败: {str(e)}")
         raise
 
 
 def run_rag_papers():
     """运行RAG论文处理流程"""
     return run_daily_paper_flow(
-        '"RAG" OR "Retrieval-Augmented Generation"', 5, "data/daily_papers.parquet"
+        '"RAG" OR "Retrieval-Augmented Generation"', 7, "data/daily_papers.parquet"
     )
 
 

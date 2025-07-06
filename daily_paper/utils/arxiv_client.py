@@ -10,6 +10,7 @@ from daily_paper.model.arxiv_paper import ArxivPaper
 
 ARXIV_URL = "http://arxiv.org/"
 
+
 def get_authors(authors, first_author=False):
     """提取作者信息"""
     if first_author:

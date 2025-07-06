@@ -9,7 +9,7 @@ import time
 import requests
 from PyPDF2 import PdfReader
 from pathlib import Path
-import logging
+from daily_paper.utils.logger import logger
 
 MAX_PAPER_TEXT_LENGTH = 128000
 
@@ -31,7 +31,7 @@ def download_paper(url: str, paper_id: str, save_dir: str, retries: int = 3) -> 
     file_path = os.path.join(save_dir, f"{paper_id}.pdf")
 
     if os.path.exists(file_path):
-        logging.info(f"文件已存在，跳过下载: {paper_id}")
+        logger.info(f"文件已存在，跳过下载: {paper_id}")
         return True
 
     for attempt in range(retries):
@@ -52,15 +52,15 @@ def download_paper(url: str, paper_id: str, save_dir: str, retries: int = 3) -> 
             if total_size > 0 and downloaded != total_size:
                 raise IOError("文件大小不匹配，可能下载不完整")
 
-            logging.info(f"成功下载: {paper_id}")
+            logger.info(f"成功下载: {paper_id}")
             return True
 
         except Exception as e:
             if attempt < retries - 1:
-                logging.warning(f"下载失败 {paper_id}，第{attempt+1}次重试...")
+                logger.warning(f"下载失败 {paper_id}，第{attempt+1}次重试...")
                 time.sleep(2)
             else:
-                logging.error(f"下载最终失败 {paper_id}: {str(e)}")
+                logger.error(f"下载最终失败 {paper_id}: {str(e)}")
                 try:
                     os.remove(file_path)
                 except:
@@ -90,13 +90,13 @@ def extract_text_from_pdf(pdf_path: str) -> str:
 
             # 文本长度限制
             if len(clean_text) > MAX_PAPER_TEXT_LENGTH:
-                logging.warning(f"文本长度 {len(clean_text)} 字符，已截断")
+                logger.warning(f"文本长度 {len(clean_text)} 字符，已截断")
                 clean_text = clean_text[:MAX_PAPER_TEXT_LENGTH] + "[...截断...]"
 
             return clean_text
 
     except Exception as pdf_error:
-        logging.error(f"PyPDF2解析失败: {pdf_path}")
+        logger.error(f"PyPDF2解析失败: {pdf_path}")
         try:
             # 备选方案：使用pdfplumber
             import pdfplumber
@@ -106,7 +106,7 @@ def extract_text_from_pdf(pdf_path: str) -> str:
                 clean_text = text.encode("utf-8", "ignore").decode("utf-8")
 
                 if len(clean_text) > MAX_PAPER_TEXT_LENGTH:
-                    logging.warning(f"文本长度 {len(clean_text)} 字符，已截断")
+                    logger.warning(f"文本长度 {len(clean_text)} 字符，已截断")
                     clean_text = clean_text[:MAX_PAPER_TEXT_LENGTH] + "[...截断...]"
 
                 return clean_text
@@ -121,7 +121,7 @@ def extract_text_from_pdf(pdf_path: str) -> str:
                 clean_text = text.encode("utf-8", "ignore").decode("utf-8")
 
                 if len(clean_text) > MAX_PAPER_TEXT_LENGTH:
-                    logging.warning(f"文本长度 {len(clean_text)} 字符，已截断")
+                    logger.warning(f"文本长度 {len(clean_text)} 字符，已截断")
                     clean_text = clean_text[:MAX_PAPER_TEXT_LENGTH] + "[...截断...]"
 
                 return clean_text
@@ -133,7 +133,7 @@ def extract_text_from_pdf(pdf_path: str) -> str:
                     f"pdfplumber错误: {str(plumber_error)}\n"
                     f"PyMuPDF错误: {str(fitz_error)}"
                 )
-                logging.error(error_msg)
+                logger.error(error_msg)
                 return ""
 
 

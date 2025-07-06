@@ -4,7 +4,7 @@ FilterExistingPapersNode - 过滤已存在论文节点
 
 from daily_paper.utils.logger import logger
 from pocketflow import Node
-from daily_paper.utils.data_manager import filter_new_papers
+from daily_paper.utils.data_manager import PaperMetaManager
 
 
 class FilterExistingPapersNode(Node):
@@ -12,23 +12,25 @@ class FilterExistingPapersNode(Node):
 
     def prep(self, shared):
         """从共享存储中读取论文数据和文件路径"""
+        paper_manager: PaperMetaManager = shared.get("paper_manager")
         raw_papers = shared.get("raw_papers", {})
-        query_params = shared.get("query_params", {})
-        meta_file = query_params.get("meta_file", "")
-        return raw_papers, meta_file
+        return raw_papers, paper_manager
 
     def exec(self, prep_res):
         """过滤已存在的论文"""
-        raw_papers, meta_file = prep_res
+        raw_papers = prep_res[0]
+        paper_manager: PaperMetaManager = prep_res[1]
         if not raw_papers:
             logger.info("没有新论文需要过滤")
             return {}
 
-        new_papers = filter_new_papers(raw_papers, meta_file)
+        new_papers = paper_manager.filter_new_papers(raw_papers)
         logger.info(f"过滤后剩余{len(new_papers)}篇新论文")
         return new_papers
 
     def post(self, shared, prep_res, exec_res):
         """将过滤后的论文保存到共享存储"""
-        shared["new_papers"] = exec_res
+        paper_manager: PaperMetaManager = shared.get("paper_manager")
+        paper_manager.set_paper(list(exec_res.values()))
+
         return "default"

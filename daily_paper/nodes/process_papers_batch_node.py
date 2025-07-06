@@ -5,11 +5,8 @@ ProcessPapersBatchNode - 批量处理论文节点
 from daily_paper.utils.logger import logger
 import pandas as pd
 from pocketflow import BatchNode
-from daily_paper.utils.arxiv_client import ArxivPaper
-from daily_paper.utils.data_manager import (
-    get_papers_without_summary,
-    update_paper_summaries,
-)
+from daily_paper.model.arxiv_paper import ArxivPaper
+from daily_paper.utils.data_manager import PaperMetaManager
 from daily_paper.utils.pdf_processor import process_paper_pdf
 from daily_paper.utils.call_llm import call_llm
 
@@ -34,15 +31,12 @@ class ProcessPapersBatchNode(BatchNode):
 
     def prep(self, shared):
         """获取需要处理的论文列表"""
-        df = shared.get("processed_papers", pd.DataFrame())
         lm = shared.get("lm")
-
-        if df.empty:
-            logger.info("没有论文需要处理")
-            return []
+        paper_manager: PaperMetaManager = shared.get("paper_manager")
 
         # 获取没有摘要的论文
-        papers_without_summary = get_papers_without_summary(df)
+        all_papers = paper_manager.get_all_papers()
+        papers_without_summary = all_papers.loc[all_papers["summary"].isna()]
 
         # 转换为处理任务列表
         tasks = []
@@ -59,32 +53,34 @@ class ProcessPapersBatchNode(BatchNode):
                 update_time=row["update_time"],
                 comments=row["comments"],
             )
-            tasks.append((index, paper, lm))
+            tasks.append((paper, lm))
 
         logger.info(f"需要处理{len(tasks)}篇论文")
         return tasks
 
     def exec(self, task):
         """处理单篇论文"""
-        index, paper, lm = task
+        paper: ArxivPaper = task[0]
+        lm = task[1]
 
         try:
             # 下载PDF并提取文本
-            paper_text = process_paper_pdf(paper["paper_url"], paper["paper_id"])
+            paper_text = process_paper_pdf(paper.paper_url, paper.paper_id)
 
             if not paper_text:
-                logger.warning(f"无法提取论文文本: {paper['paper_id']}")
-                return index, "无法提取论文文本"
+                logger.warning(f"无法提取论文文本: {paper.paper_id}")
+                return paper.paper_id, "无法提取论文文本"
 
             # 生成摘要
-            summary = summarize_paper(lm, paper_text)
-            logger.info(f"已生成摘要: {paper['paper_id']}")
+            # summary = summarize_paper(paper_text)
+            summary = " test"
+            logger.info(f"已生成摘要: {paper.paper_id}")
 
-            return index, summary
+            return paper.paper_id, summary
 
         except Exception as e:
-            logger.error(f"处理论文失败 {paper['paper_id']}: {str(e)}")
-            return index, f"处理失败: {str(e)}"
+            logger.error(f"处理论文失败 {paper.paper_id}: {str(e)}")
+            return paper.paper_id, f"处理失败: {str(e)}"
 
     def post(self, shared, prep_res, exec_res_list):
         """更新论文摘要"""
@@ -93,20 +89,20 @@ class ProcessPapersBatchNode(BatchNode):
             return "default"
 
         # 构建摘要字典
-        summaries = {index: summary for index, summary in exec_res_list}
+        update_dict = {}
+        for paper_id, summary in exec_res_list:
+            update_dict[paper_id] = {
+                "summary": summary,
+            }
+
+        paper_manager: PaperMetaManager = shared.get("paper_manager")
+        print(paper_manager.df)
 
         # 更新DataFrame
-        df = shared.get("processed_papers", pd.DataFrame())
-        df = update_paper_summaries(df, summaries)
+        paper_manager.update_papers(update_dict)
 
         # 保存更新后的数据
-        query_params = shared.get("query_params", {})
-        meta_file = query_params.get("meta_file", "")
-        if meta_file:
-            df.to_parquet(meta_file, engine="pyarrow")
+        paper_manager.persist()
 
-        shared["processed_papers"] = df
-        shared["summaries"] = summaries
-
-        logger.info(f"批量更新了{len(summaries)}篇论文摘要")
+        logger.info(f"批量更新了{len(exec_res_list)}篇论文摘要")
         return "default"

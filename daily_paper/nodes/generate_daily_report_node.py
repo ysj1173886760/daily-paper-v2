@@ -8,7 +8,7 @@ from pocketflow import Node
 from daily_paper.utils.feishu_client import send_daily_report_to_feishu
 from daily_paper.utils.call_llm import call_llm
 from daily_paper.utils.logger import logger
-from daily_paper.utils.data_manager import get_daily_papers
+from daily_paper.utils.data_manager import PaperMetaManager
 
 
 def generate_daily_summary(combined_text):
@@ -35,15 +35,12 @@ class GenerateDailyReportNode(Node):
 
     def prep(self, shared):
         """获取今日论文数据"""
-        df = shared.get("processed_papers", pd.DataFrame())
         lm = shared.get("lm")
-
-        if df.empty:
-            return None, None
+        paper_manager: PaperMetaManager = shared.get("paper_manager")
 
         # 获取今日论文
         target_date = datetime.date.today()
-        daily_papers = get_daily_papers_from_df(df, target_date)
+        daily_papers = paper_manager.get_paper_by_day(target_date)
 
         if daily_papers.empty:
             logger.info(f"{target_date} 没有论文需要生成日报")

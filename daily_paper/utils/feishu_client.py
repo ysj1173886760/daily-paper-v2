@@ -5,7 +5,7 @@ Feishu Client Utilities
 """
 
 import requests
-import logging
+from daily_paper.utils.logger import logger
 import os
 from typing import Dict, Any
 from tenacity import retry, wait_exponential, stop_after_attempt
@@ -44,7 +44,7 @@ def send_paper_to_feishu(paper: ArxivPaper, summary: str) -> bool:
         是否发送成功
     """
     if not FEISHU_WEBHOOK_URL:
-        logging.error("飞书Webhook地址未配置")
+        logger.error("飞书Webhook地址未配置")
         return False
 
     formatted_summary = summary.replace("\\n", "\n")
@@ -56,12 +56,12 @@ def send_paper_to_feishu(paper: ArxivPaper, summary: str) -> bool:
                 {
                     "tag": "div",
                     "text": {
-                        "content": f"**{paper['paper_title']}**\n"
-                        f"**更新时间**: {paper['update_time']}\n\n"
-                        f"👤 {paper['paper_authors']}\n\n"
+                        "content": f"**{paper.paper_title}**\n"
+                        f"**更新时间**: {paper.update_time}\n\n"
+                        f"👤 {paper.paper_authors}\n\n"
                         f"💡 AI总结：{formatted_summary}...\n\n"
                         f"---\n"
-                        f"📎 [论文原文]({paper['paper_url']})",
+                        f"📎 [论文原文]({paper.paper_url})",
                         "tag": "lark_md",
                     },
                 }
@@ -72,10 +72,10 @@ def send_paper_to_feishu(paper: ArxivPaper, summary: str) -> bool:
 
     try:
         send_to_feishu_with_retry(message)
-        logging.info(f"飞书推送成功: {paper['paper_id']}")
+        logger.info(f"飞书推送成功: {paper.paper_id}")
         return True
     except Exception as e:
-        logging.error(f"飞书推送失败: {str(e)}")
+        logger.error(f"飞书推送失败: {str(e)}")
         return False
 
 
@@ -91,7 +91,7 @@ def send_daily_report_to_feishu(report_content: str, target_date: str) -> bool:
         是否发送成功
     """
     if not FEISHU_WEBHOOK_URL:
-        logging.error("飞书Webhook地址未配置")
+        logger.error("飞书Webhook地址未配置")
         return False
 
     message = {
@@ -114,10 +114,10 @@ def send_daily_report_to_feishu(report_content: str, target_date: str) -> bool:
 
     try:
         send_to_feishu_with_retry(message)
-        logging.info(f"飞书日报推送成功: {target_date}")
+        logger.info(f"飞书日报推送成功: {target_date}")
         return True
     except Exception as e:
-        logging.error(f"飞书日报推送失败: {str(e)}")
+        logger.error(f"飞书日报推送失败: {str(e)}")
         return False
 
 
