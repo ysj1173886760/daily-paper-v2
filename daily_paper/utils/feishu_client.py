@@ -64,7 +64,7 @@ def send_paper_to_feishu(paper: ArxivPaper, summary: str) -> bool:
                         "content": f"**{paper.paper_title}**\n"
                         f"**更新时间**: {paper.update_time}\n\n"
                         f"👤 {paper.paper_authors}\n\n"
-                        f"💡 AI总结：{formatted_summary}...\n\n"
+                        f"💡 {formatted_summary}\n\n"
                         f"---\n"
                         f"📎 [论文原文]({paper.paper_url})",
                         "tag": "lark_md",

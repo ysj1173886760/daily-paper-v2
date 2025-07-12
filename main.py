@@ -12,8 +12,11 @@ def main():
 
     try:
         config = Config.from_yaml(args.config_path)
-        # result = run_daily_paper_flow(config)
-        result = run_daily_paper_flow_v2(config)
+
+        if config.use_v2_prompt:
+            result = run_daily_paper_flow_v2(config)
+        else:
+            result = run_daily_paper_flow(config)
             
         # 输出执行结果摘要
         logger.info("=== 执行结果摘要 ===")

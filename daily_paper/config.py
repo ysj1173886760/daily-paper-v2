@@ -15,6 +15,8 @@ class Config(BaseModel):
 
     feishu_webhook_url: str = ""
 
+    use_v2_prompt: bool = False
+
     @classmethod
     def from_yaml(cls, yaml_path: str):
         with open(yaml_path, "r") as f:
