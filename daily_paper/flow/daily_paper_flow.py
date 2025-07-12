@@ -2,7 +2,7 @@ from pocketflow import Flow
 from daily_paper.nodes import (
     FetchPapersNode,
     FilterExistingPapersNode,
-    ProcessPapersBatchNode,
+    ParallelProcessPapersNode,
     PushToFeishuNode,
 )
 from daily_paper.utils.call_llm import init_llm
@@ -17,7 +17,7 @@ def create_daily_paper_flow(config: Config) -> Flow:
         config.arxiv_topic_list, config.arxiv_search_offset, config.arxiv_search_limit
     )
     filter_node = FilterExistingPapersNode()
-    process_node = ProcessPapersBatchNode()
+    process_node = ParallelProcessPapersNode()
     push_node = PushToFeishuNode()
 
     fetch_node >> filter_node >> process_node >> push_node

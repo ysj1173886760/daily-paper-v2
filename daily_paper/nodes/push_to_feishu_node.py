@@ -24,7 +24,7 @@ class PushToFeishuNode(Node):
         ]
 
         # 按时间排序（旧到新）
-        sorted_df = to_push.sort_values("update_time", ascending=False)
+        sorted_df = to_push.sort_values("update_time", ascending=True)
 
         # 转换为推送任务列表
         tasks = []
