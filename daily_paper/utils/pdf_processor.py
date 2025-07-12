@@ -70,7 +70,7 @@ def download_paper(url: str, paper_id: str, save_dir: str, retries: int = 3) -> 
     return False
 
 
-def extract_text_from_pdf(pdf_path: str) -> str:
+def extract_text_from_pdf(pdf_path: str, max_paper_text_length) -> str:
     """
     提取PDF文本内容
 
@@ -89,9 +89,9 @@ def extract_text_from_pdf(pdf_path: str) -> str:
             clean_text = text.encode("utf-8", "ignore").decode("utf-8")
 
             # 文本长度限制
-            if len(clean_text) > MAX_PAPER_TEXT_LENGTH:
+            if len(clean_text) > max_paper_text_length:
                 logger.warning(f"文本长度 {len(clean_text)} 字符，已截断")
-                clean_text = clean_text[:MAX_PAPER_TEXT_LENGTH] + "[...截断...]"
+                clean_text = clean_text[:max_paper_text_length] + "[...截断...]"
 
             return clean_text
 
@@ -105,9 +105,9 @@ def extract_text_from_pdf(pdf_path: str) -> str:
                 text = "\n".join([page.extract_text() for page in pdf.pages])
                 clean_text = text.encode("utf-8", "ignore").decode("utf-8")
 
-                if len(clean_text) > MAX_PAPER_TEXT_LENGTH:
+                if len(clean_text) > max_paper_text_length:
                     logger.warning(f"文本长度 {len(clean_text)} 字符，已截断")
-                    clean_text = clean_text[:MAX_PAPER_TEXT_LENGTH] + "[...截断...]"
+                    clean_text = clean_text[:max_paper_text_length] + "[...截断...]"
 
                 return clean_text
 
@@ -120,9 +120,9 @@ def extract_text_from_pdf(pdf_path: str) -> str:
                 text = "\n".join([page.get_text() for page in doc])
                 clean_text = text.encode("utf-8", "ignore").decode("utf-8")
 
-                if len(clean_text) > MAX_PAPER_TEXT_LENGTH:
+                if len(clean_text) > max_paper_text_length:
                     logger.warning(f"文本长度 {len(clean_text)} 字符，已截断")
-                    clean_text = clean_text[:MAX_PAPER_TEXT_LENGTH] + "[...截断...]"
+                    clean_text = clean_text[:max_paper_text_length] + "[...截断...]"
 
                 return clean_text
 
@@ -137,7 +137,12 @@ def extract_text_from_pdf(pdf_path: str) -> str:
                 return ""
 
 
-def process_paper_pdf(paper_url: str, paper_id: str, save_dir: str = "papers") -> str:
+def process_paper_pdf(
+    paper_url: str,
+    paper_id: str,
+    save_dir: str = "papers",
+    max_paper_text_length: int = MAX_PAPER_TEXT_LENGTH,
+) -> str:
     """
     处理单篇论文PDF（下载+提取文本）
 
@@ -158,7 +163,7 @@ def process_paper_pdf(paper_url: str, paper_id: str, save_dir: str = "papers") -
 
     # 提取文本
     pdf_path = os.path.join(save_dir, f"{paper_id}.pdf")
-    return extract_text_from_pdf(pdf_path)
+    return extract_text_from_pdf(pdf_path, max_paper_text_length)
 
 
 if __name__ == "__main__":

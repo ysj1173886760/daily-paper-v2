@@ -9,9 +9,15 @@ from daily_paper.utils.arxiv_client import ArxivPaper
 from daily_paper.utils.data_manager import PaperMetaManager
 from daily_paper.utils.feishu_client import send_paper_to_feishu
 
+from typing import Callable
+
 
 class PushToFeishuNode(Node):
     """推送论文到飞书节点"""
+
+    def __init__(self, summary_formatter: Callable = None, **kwargs):
+        super().__init__(**kwargs)
+        self.summary_formatter = summary_formatter
 
     def prep(self, shared):
         """获取需要推送的论文"""
@@ -55,7 +61,12 @@ class PushToFeishuNode(Node):
 
         for paper, summary in tasks:
             try:
-                if send_paper_to_feishu(paper, summary):
+                formatted_summary = (
+                    self.summary_formatter(summary)
+                    if self.summary_formatter
+                    else summary
+                )
+                if send_paper_to_feishu(paper, formatted_summary):
                     success_paper_ids.append(paper.paper_id)
                     logger.info(f"推送成功: {paper.paper_id}")
                 else:
