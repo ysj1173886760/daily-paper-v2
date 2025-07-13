@@ -15,7 +15,7 @@ def init_llm(llm_base_url: str, llm_api_key: str, llm_model: str):
 
 
 # Learn more about calling the LLM: https://the-pocket.github.io/PocketFlow/utility_function/llm.html
-def call_llm(prompt) -> str:
+def call_llm(prompt, temperature: float = 0.2) -> str:
     """
     调用LLM（兼容OpenAI API）
 
@@ -27,7 +27,9 @@ def call_llm(prompt) -> str:
     """
     client = OpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
     r = client.chat.completions.create(
-        model=CHAT_MODEL_NAME, messages=[{"role": "user", "content": prompt}]
+        model=CHAT_MODEL_NAME,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=temperature,
     )
     return r.choices[0].message.content
 
