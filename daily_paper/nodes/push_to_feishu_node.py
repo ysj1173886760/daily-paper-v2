@@ -34,11 +34,12 @@ class PushToFeishuNode(Node):
         """获取需要推送的论文"""
         paper_manager: PaperMetaManager = shared.get("paper_manager")
 
-        # 获取有摘要但未推送的论文
+        # 获取有摘要但未推送且未被过滤的论文
         all_papers = paper_manager.get_all_papers()
         to_push = all_papers.loc[
             all_papers["summary"].apply(is_valid_summary)
             & (all_papers["pushed"] == False)
+            & (~all_papers["filtered_out"])
         ]
 
         # 按时间排序（旧到新）

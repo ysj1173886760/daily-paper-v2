@@ -2,6 +2,7 @@ from pocketflow import Flow
 from daily_paper.nodes import (
     FetchPapersNode,
     FilterExistingPapersNode,
+    FilterIrrelevantPapersNode,
     ProcessPapersV2Node,
     PushToFeishuNode,
 )
@@ -21,7 +22,16 @@ def create_daily_paper_flow(config: Config) -> Flow:
     process_node = ProcessPapersV2Node()
     push_node = PushToFeishuNode(summary_formatter=yaml_to_markdown)
 
-    fetch_node >> filter_node >> process_node >> push_node
+    # 基础流程：fetch -> filter -> process -> push
+    if config.enable_llm_filter:
+        # 如果启用LLM过滤，在现有过滤后增加LLM过滤节点
+        llm_filter_node = FilterIrrelevantPapersNode(config)
+        fetch_node >> filter_node >> llm_filter_node >> process_node >> push_node
+        logger.info("已启用LLM论文过滤功能")
+    else:
+        # 原有流程
+        fetch_node >> filter_node >> process_node >> push_node
+        logger.info("未启用LLM论文过滤功能")
 
     flow = Flow(start=fetch_node)
 

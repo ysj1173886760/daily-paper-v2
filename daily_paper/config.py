@@ -17,6 +17,10 @@ class Config(BaseModel):
 
     use_v2_prompt: bool = False
 
+    # LLM论文过滤相关配置
+    enable_llm_filter: bool = False  # 是否启用LLM过滤器
+    user_interested_content: str = ""  # 用户感兴趣的论文内容描述
+
     @classmethod
     def from_yaml(cls, yaml_path: str):
         with open(yaml_path, "r") as f:

@@ -141,9 +141,11 @@ class ProcessPapersV2Node(Node):
         """获取需要处理的论文列表"""
         paper_manager: PaperMetaManager = shared.get("paper_manager")
 
-        # 获取没有摘要的论文
+        # 获取没有摘要且未被过滤的论文
         all_papers = paper_manager.get_all_papers()
-        papers_without_summary = all_papers.loc[all_papers["summary"].isna()]
+        papers_without_summary = all_papers.loc[
+            (all_papers["summary"].isna()) & (~all_papers["filtered_out"])
+        ]
 
         # 转换为ArxivPaper对象列表
         papers = []

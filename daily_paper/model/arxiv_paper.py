@@ -17,3 +17,4 @@ class ArxivPaper(BaseModel):
     # system internal state
     summary: str | None = None
     pushed: bool = False
+    filtered_out: bool = False  # 标记是否被LLM过滤器过滤掉
