@@ -11,7 +11,7 @@ from daily_paper.utils.feishu_client import init_feishu
 from daily_paper.utils.logger import logger
 from daily_paper.utils.data_manager import PaperMetaManager
 from daily_paper.config import Config
-from daily_paper.utils.yaml_to_markdown import yaml_to_markdown
+from daily_paper.templates import get_template
 
 
 def create_daily_paper_flow(config: Config) -> Flow:
@@ -19,8 +19,22 @@ def create_daily_paper_flow(config: Config) -> Flow:
         config.arxiv_topic_list, config.arxiv_search_offset, config.arxiv_search_limit
     )
     filter_node = FilterExistingPapersNode()
-    process_node = ProcessPapersV2Node()
-    push_node = PushToFeishuNode(summary_formatter=yaml_to_markdown)
+    
+    # 使用配置中的模板创建处理节点
+    try:
+        template = get_template(config.analysis_template)
+        process_node = ProcessPapersV2Node(template_name=config.analysis_template)
+        logger.info(f"使用分析模板: {config.analysis_template} ({template.description})")
+        
+        # 使用模板的markdown格式化器
+        push_node = PushToFeishuNode(summary_formatter=template.format_to_markdown)
+    except ValueError as e:
+        logger.error(f"模板配置错误: {e}")
+        # 回退到默认配置
+        process_node = ProcessPapersV2Node(template_name="v2")
+        template = get_template("v2")
+        push_node = PushToFeishuNode(summary_formatter=template.format_to_markdown)
+        logger.warning("回退到默认V2模板")
 
     # 基础流程：fetch -> filter -> process -> push
     if config.enable_llm_filter:

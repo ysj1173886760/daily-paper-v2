@@ -20,6 +20,9 @@ class Config(BaseModel):
     # LLM论文过滤相关配置
     enable_llm_filter: bool = False  # 是否启用LLM过滤器
     user_interested_content: str = ""  # 用户感兴趣的论文内容描述
+    
+    # 论文分析模板配置
+    analysis_template: str = "v2"  # 分析模板名称，可选值: "v1", "v2"
 
     @classmethod
     def from_yaml(cls, yaml_path: str):

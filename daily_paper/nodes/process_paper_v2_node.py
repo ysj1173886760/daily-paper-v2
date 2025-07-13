@@ -1,6 +1,6 @@
 """
 ProcessPapersV2Node - 论文处理节点（V2版本）
-复用ParallelProcessPapersNode的代码结构，支持自定义summary generator
+支持基于模板的论文分析系统
 """
 
 from daily_paper.utils.logger import logger
@@ -10,85 +10,42 @@ from daily_paper.model.arxiv_paper import ArxivPaper
 from daily_paper.utils.data_manager import PaperMetaManager
 from daily_paper.utils.pdf_processor import process_paper_pdf
 from daily_paper.utils.call_llm import call_llm
+from daily_paper.templates import get_template, PaperAnalysisTemplate
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 import json
 import yaml
 
 
-def analyze_paper_v2(paper_text):
+def analyze_paper_with_template(paper_text: str, template: PaperAnalysisTemplate) -> str:
     """
-    论文深度分析（V2版本）- 作为自定义summary generator
-
+    使用指定模板分析论文
+    
     Args:
         paper_text: 论文文本
-
+        template: 分析模板实例
+        
     Returns:
         结构化分析结果（字符串形式，用于存储在summary字段）
     """
-    prompt = f"""
-请仔细阅读以下论文内容，并回答下列问题，用中文回答：
-
-论文内容：
-{paper_text}
-
-请按照以下格式回答，每个问题用一个单独的字段表示：
-
-```yaml
-problem: |
-  论文要解决的是什么样的问题
-background: |
-  前人是怎么研究这个问题的，现在水平如何
-idea_source: |
-  这篇论文的idea从哪里来
-solution: |
-  论文的具体方案是什么
-experiment: |
-  论文是怎么设计实验来验证方案效果的
-conclusion: |
-  这篇论文能得出什么样的结论
-future_work: |
-  相关工作未来还有哪些思路
-pseudocode: |
-  用伪代码描述一下论文的核心思想
-```
-
-请确保输出格式严格按照上述YAML格式，每个字段都要填写完整。
-"""
-
+    prompt = template.generate_prompt(paper_text)
     response = call_llm(prompt)
+    return template.parse_response(response)
 
-    # 提取YAML部分
-    yaml_start = response.find("```yaml")
-    yaml_end = response.find("```", yaml_start + 7)
 
-    if yaml_start != -1 and yaml_end != -1:
-        yaml_content = response[yaml_start + 7 : yaml_end].strip()
-
-        # 解析YAML验证格式
-        analysis = yaml.safe_load(yaml_content)
-
-        # 验证所有必需字段都存在
-        required_fields = [
-            "problem",
-            "background",
-            "idea_source",
-            "solution",
-            "experiment",
-            "conclusion",
-            "future_work",
-            "pseudocode",
-        ]
-
-        for field in required_fields:
-            if field not in analysis:
-                analysis[field] = "分析不完整"
-
-        return yaml_content
-
-    else:
-        logger.error("未找到YAML格式的回答")
-        raise Exception("未找到YAML格式的回答")
+def analyze_paper_v2(paper_text):
+    """
+    论文深度分析（V2版本）- 保持向后兼容性
+    
+    Args:
+        paper_text: 论文文本
+        
+    Returns:
+        结构化分析结果（字符串形式，用于存储在summary字段）
+    """
+    # 默认使用V2模板保持向后兼容
+    template = get_template("v2")
+    return analyze_paper_with_template(paper_text, template)
 
 
 def process_single_paper_with_generator(
@@ -121,21 +78,33 @@ def process_single_paper_with_generator(
 class ProcessPapersV2Node(Node):
     """
     论文处理节点（V2版本）
-
-    复用ParallelProcessPapersNode的代码结构，支持自定义summary generator
+    
+    支持基于模板的论文分析系统
     """
 
-    def __init__(self, summary_generator=None, max_workers=16, **kwargs):
+    def __init__(self, template_name="v2", max_workers=16, **kwargs):
         """
         初始化并行处理节点
 
         Args:
-            summary_generator: 自定义摘要生成函数，默认使用analyze_paper_v2
+            template_name: 分析模板名称，默认"v2"
+            summary_generator: 自定义摘要生成函数，如果提供则忽略template_name
             max_workers: 最大并发线程数，默认16
         """
         super().__init__(**kwargs)
-        self.summary_generator = summary_generator or analyze_paper_v2
+        self.template_name = template_name
         self.max_workers = max_workers
+        
+        try:
+            template = get_template(template_name)
+            self.summary_generator = lambda paper_text: analyze_paper_with_template(paper_text, template)
+            logger.info(f"使用模板: {template_name} ({template.description})")
+        except ValueError as e:
+            logger.error(f"模板错误: {e}")
+            # 回退到默认V2模板
+            template = get_template("v2")
+            self.summary_generator = lambda paper_text: analyze_paper_with_template(paper_text, template)
+            logger.warning("回退到默认V2模板")
 
     def prep(self, shared):
         """获取需要处理的论文列表"""
@@ -165,7 +134,10 @@ class ProcessPapersV2Node(Node):
             papers.append(paper)
 
         logger.info(f"需要处理{len(papers)}篇论文，并发度: {self.max_workers}")
-        logger.info(f"使用摘要生成器: {self.summary_generator.__name__}")
+        if hasattr(self, 'template_name'):
+            logger.info(f"使用分析模板: {self.template_name}")
+        else:
+            logger.info(f"使用摘要生成器: {self.summary_generator.__name__}")
         return papers
 
     def exec(self, papers):
