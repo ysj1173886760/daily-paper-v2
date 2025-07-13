@@ -17,14 +17,16 @@ import json
 import yaml
 
 
-def analyze_paper_with_template(paper_text: str, template: PaperAnalysisTemplate) -> str:
+def analyze_paper_with_template(
+    paper_text: str, template: PaperAnalysisTemplate
+) -> str:
     """
     使用指定模板分析论文
-    
+
     Args:
         paper_text: 论文文本
         template: 分析模板实例
-        
+
     Returns:
         结构化分析结果（字符串形式，用于存储在summary字段）
     """
@@ -36,10 +38,10 @@ def analyze_paper_with_template(paper_text: str, template: PaperAnalysisTemplate
 def analyze_paper_v2(paper_text):
     """
     论文深度分析（V2版本）- 保持向后兼容性
-    
+
     Args:
         paper_text: 论文文本
-        
+
     Returns:
         结构化分析结果（字符串形式，用于存储在summary字段）
     """
@@ -78,7 +80,7 @@ def process_single_paper_with_generator(
 class ProcessPapersV2Node(Node):
     """
     论文处理节点（V2版本）
-    
+
     支持基于模板的论文分析系统
     """
 
@@ -94,16 +96,20 @@ class ProcessPapersV2Node(Node):
         super().__init__(**kwargs)
         self.template_name = template_name
         self.max_workers = max_workers
-        
+
         try:
             template = get_template(template_name)
-            self.summary_generator = lambda paper_text: analyze_paper_with_template(paper_text, template)
+            self.summary_generator = lambda paper_text: analyze_paper_with_template(
+                paper_text, template
+            )
             logger.info(f"使用模板: {template_name} ({template.description})")
         except ValueError as e:
             logger.error(f"模板错误: {e}")
             # 回退到默认V2模板
             template = get_template("v2")
-            self.summary_generator = lambda paper_text: analyze_paper_with_template(paper_text, template)
+            self.summary_generator = lambda paper_text: analyze_paper_with_template(
+                paper_text, template
+            )
             logger.warning("回退到默认V2模板")
 
     def prep(self, shared):
@@ -134,7 +140,7 @@ class ProcessPapersV2Node(Node):
             papers.append(paper)
 
         logger.info(f"需要处理{len(papers)}篇论文，并发度: {self.max_workers}")
-        if hasattr(self, 'template_name'):
+        if hasattr(self, "template_name"):
             logger.info(f"使用分析模板: {self.template_name}")
         else:
             logger.info(f"使用摘要生成器: {self.summary_generator.__name__}")

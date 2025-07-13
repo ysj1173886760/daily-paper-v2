@@ -1,6 +1,5 @@
 from daily_paper.utils.logger import logger
 import argparse
-from daily_paper.flow.daily_paper_flow import run_daily_paper_flow
 from daily_paper.flow.daily_paper_flow_v2 import run_daily_paper_flow_v2
 from daily_paper.config import Config
 
@@ -12,11 +11,9 @@ def main():
 
     try:
         config = Config.from_yaml(args.config_path)
-
-        if config.use_v2_prompt:
-            result = run_daily_paper_flow_v2(config)
-        else:
-            result = run_daily_paper_flow(config)
+        
+        # 统一使用V2版本的流程（支持模板系统）
+        result = run_daily_paper_flow_v2(config)
             
         # 输出执行结果摘要
         logger.info("=== 执行结果摘要 ===")

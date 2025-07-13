@@ -8,15 +8,15 @@ from .base import PaperAnalysisTemplate
 
 class V2Template(PaperAnalysisTemplate):
     """V2版本的论文分析模板，提供深度结构化分析"""
-    
+
     @property
     def name(self) -> str:
         return "v2"
-    
-    @property 
+
+    @property
     def description(self) -> str:
         return "深度结构化论文分析模板，包含11个维度的详细分析"
-    
+
     def generate_prompt(self, paper_text: str) -> str:
         """生成V2版本的分析prompt"""
         return f"""
@@ -99,60 +99,60 @@ evaluation: |
 3. 分析要深入透彻，体现对论文的深度理解
 4. 保持客观性，既要指出优点也要指出不足
 """
-    
+
     def parse_response(self, response: str) -> str:
         """解析V2版本的响应"""
         yaml_content = self._extract_yaml_content(response)
-        
+
         # 解析YAML验证格式
         analysis = yaml.safe_load(yaml_content)
-        
+
         # 验证并补充缺失字段
         analysis = self._validate_fields(analysis)
-        
+
         return yaml_content
-    
+
     def _extract_yaml_content(self, response: str) -> str:
         """从LLM响应中提取YAML内容"""
         yaml_start = response.find("```yaml")
         yaml_end = response.find("```", yaml_start + 7)
-        
+
         if yaml_start != -1 and yaml_end != -1:
             return response[yaml_start + 7 : yaml_end].strip()
         else:
             raise Exception("未找到YAML格式的回答")
-    
+
     def _get_required_fields(self) -> list[str]:
         """获取V2版本的必需字段"""
         return [
             "title",
-            "problem", 
+            "problem",
             "background",
             "innovation",
             "solution",
-            "experiment", 
+            "experiment",
             "conclusion",
             "future_work",
             "implementation",
             "impact",
             "evaluation",
         ]
-    
+
     def _validate_fields(self, analysis: dict) -> dict:
         """验证所有必需字段是否存在，缺失的字段填充默认值"""
         required_fields = self._get_required_fields()
-        
+
         for field in required_fields:
             if field not in analysis:
                 analysis[field] = "分析不完整"
-                
+
         return analysis
-    
+
     def format_to_markdown(self, content: str) -> str:
         """将V2版本的YAML转换为Markdown"""
         try:
             data = yaml.safe_load(content)
-            
+
             markdown = f"""# 论文分析报告
 
 ## 📄 论文信息
@@ -192,6 +192,6 @@ evaluation: |
 *分析模板版本: V2 - 深度结构化分析*
 """
             return markdown
-            
+
         except yaml.YAMLError as e:
             return f"YAML解析错误: {e}\n\n原始内容:\n{content}"

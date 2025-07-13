@@ -19,13 +19,13 @@ def create_daily_paper_flow(config: Config) -> Flow:
         config.arxiv_topic_list, config.arxiv_search_offset, config.arxiv_search_limit
     )
     filter_node = FilterExistingPapersNode()
-    
+
     # 使用配置中的模板创建处理节点
     try:
         template = get_template(config.analysis_template)
         process_node = ProcessPapersV2Node(template_name=config.analysis_template)
         logger.info(f"使用分析模板: {config.analysis_template} ({template.description})")
-        
+
         # 使用模板的markdown格式化器
         push_node = PushToFeishuNode(summary_formatter=template.format_to_markdown)
     except ValueError as e:

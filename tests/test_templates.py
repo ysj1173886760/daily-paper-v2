@@ -6,7 +6,7 @@
 
 import sys
 import os
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from daily_paper.templates import get_template, list_templates
 
@@ -35,21 +35,31 @@ def test_template_functionality():
     Experiments show 15% improvement over baseline methods.
     """
     
-    for template_name in ["v1", "v2"]:
+    for template_name in ["simple", "v1", "v2"]:
         print(f"\n--- 测试 {template_name} 模板 ---")
         
         try:
             template = get_template(template_name)
             print(f"模板名称: {template.name}")
             print(f"模板描述: {template.description}")
-            print(f"必需字段: {template._get_required_fields()}")  # 使用私有方法测试
+            
+            # simple模板没有_get_required_fields方法
+            if hasattr(template, '_get_required_fields'):
+                print(f"必需字段: {template._get_required_fields()}")
+            else:
+                print("必需字段: N/A (简单模板)")
             
             # 生成prompt（不调用LLM）
             prompt = template.generate_prompt(sample_text)
             print(f"Prompt长度: {len(prompt)} 字符")
             
             # 测试格式转换
-            sample_yaml = """
+            if template_name == "simple":
+                # simple模板直接使用文本
+                sample_content = "这是一篇关于深度学习的论文介绍"
+            else:
+                # 其他模板使用YAML
+                sample_content = """
 title: |
   Sample Paper Title
 problem: |
@@ -57,7 +67,7 @@ problem: |
 solution: |
   This is a sample solution
 """
-            markdown = template.format_to_markdown(sample_yaml)
+            markdown = template.format_to_markdown(sample_content)
             print(f"Markdown输出预览:")
             print(markdown[:200] + "..." if len(markdown) > 200 else markdown)
             
