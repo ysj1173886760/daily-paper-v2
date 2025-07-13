@@ -12,6 +12,17 @@ from daily_paper.utils.feishu_client import send_paper_to_feishu
 from typing import Callable
 
 
+def is_valid_summary(summary) -> bool:
+    """检查summary是否有效（不为空且有实际内容）"""
+    # 检查是否为None或NaN
+    if summary is None or pd.isna(summary):
+        return False
+
+    # 转换为字符串并检查内容
+    summary_str = str(summary).strip()
+    return summary_str != "" and summary_str != "None"
+
+
 class PushToFeishuNode(Node):
     """推送论文到飞书节点"""
 
@@ -26,7 +37,8 @@ class PushToFeishuNode(Node):
         # 获取有摘要但未推送的论文
         all_papers = paper_manager.get_all_papers()
         to_push = all_papers.loc[
-            all_papers["summary"].notna() & all_papers["pushed"] == False
+            all_papers["summary"].apply(is_valid_summary)
+            & (all_papers["pushed"] == False)
         ]
 
         # 按时间排序（旧到新）

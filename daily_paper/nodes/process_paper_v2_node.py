@@ -56,44 +56,39 @@ pseudocode: |
 请确保输出格式严格按照上述YAML格式，每个字段都要填写完整。
 """
 
-    try:
-        response = call_llm(prompt)
+    response = call_llm(prompt)
 
-        # 提取YAML部分
-        yaml_start = response.find("```yaml")
-        yaml_end = response.find("```", yaml_start + 7)
+    # 提取YAML部分
+    yaml_start = response.find("```yaml")
+    yaml_end = response.find("```", yaml_start + 7)
 
-        if yaml_start != -1 and yaml_end != -1:
-            yaml_content = response[yaml_start + 7 : yaml_end].strip()
+    if yaml_start != -1 and yaml_end != -1:
+        yaml_content = response[yaml_start + 7 : yaml_end].strip()
 
-            # 解析YAML验证格式
-            analysis = yaml.safe_load(yaml_content)
+        # 解析YAML验证格式
+        analysis = yaml.safe_load(yaml_content)
 
-            # 验证所有必需字段都存在
-            required_fields = [
-                "problem",
-                "background",
-                "idea_source",
-                "solution",
-                "experiment",
-                "conclusion",
-                "future_work",
-                "pseudocode",
-            ]
+        # 验证所有必需字段都存在
+        required_fields = [
+            "problem",
+            "background",
+            "idea_source",
+            "solution",
+            "experiment",
+            "conclusion",
+            "future_work",
+            "pseudocode",
+        ]
 
-            for field in required_fields:
-                if field not in analysis:
-                    analysis[field] = "分析不完整"
+        for field in required_fields:
+            if field not in analysis:
+                analysis[field] = "分析不完整"
 
-            return yaml_content
+        return yaml_content
 
-        else:
-            logger.error("未找到YAML格式的回答")
-            raise Exception("未找到YAML格式的回答")
-
-    except Exception as e:
-        logger.error(f"论文分析失败: {str(e)}")
-        return f"分析失败: {str(e)}"
+    else:
+        logger.error("未找到YAML格式的回答")
+        raise Exception("未找到YAML格式的回答")
 
 
 def process_single_paper_with_generator(
@@ -196,7 +191,7 @@ class ProcessPapersV2Node(Node):
                     results.append((paper_id, summary))
                     logger.info(f"完成处理论文 {paper_id}")
                 except Exception as e:
-                    logger.error(f"线程执行失败: {str(e)}")
+                    logger.error(f"处理失败: {str(e)}")
                     failed_results.append(str(e))
                     # skip adding this paper to results
 
