@@ -22,6 +22,18 @@ class Config(BaseModel):
     # 论文分析模板配置
     analysis_template: str = "simple"  # 分析模板名称，可选值: "simple", "v1", "v2"
 
+    # RSS发布配置
+    rss_site_url: str = "https://your-username.github.io/daily-papers-site"
+    rss_feed_title: str = "Daily AI Papers"
+    rss_feed_description: str = (
+        "Latest papers in AI research - RAG, Knowledge Graph, and more"
+    )
+
+    # GitHub Pages部署配置
+    github_token: str = ""  # GitHub Personal Access Token
+    github_repo_owner: str = ""  # GitHub用户名
+    github_repo_name: str = "daily-papers-site"  # 网站仓库名
+
     @classmethod
     def from_yaml(cls, yaml_path: str):
         with open(yaml_path, "r") as f:

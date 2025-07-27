@@ -159,6 +159,41 @@ class PaperMetaManager:
         """获取论文总数"""
         return len(self.df)
 
+    def get_summary(self, paper_id: str) -> Optional[str]:
+        """获取论文总结"""
+        matches = self.df[self.df["paper_id"] == paper_id]
+        if matches.empty:
+            return None
+        return matches.iloc[0].get("summary")
+
+    def get_papers_with_summaries(
+        self, unpushed_only: bool = False, unpushed_rss_only: bool = False
+    ) -> pd.DataFrame:
+        """
+        获取有总结的论文
+
+        Args:
+            unpushed_only: 只返回未推送到Feishu的论文
+            unpushed_rss_only: 只返回未推送到RSS的论文
+
+        Returns:
+            过滤后的DataFrame
+        """
+        if self.df.empty:
+            return pd.DataFrame()
+
+        # 过滤有总结的论文
+        has_summary = self.df["summary"].notna() & (self.df["summary"] != "")
+        result = self.df[has_summary].copy()
+
+        if unpushed_only:
+            result = result[result["pushed"] == False]
+
+        if unpushed_rss_only:
+            result = result[result["push_rss"] == False]
+
+        return result
+
 
 if __name__ == "__main__":
     # 测试PaperMetaManager

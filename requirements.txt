@@ -5,3 +5,5 @@ dspy
 arxiv
 PyPDF2
 tenacity
+feedgen
+markdown

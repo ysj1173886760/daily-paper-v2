@@ -17,4 +17,5 @@ class ArxivPaper(BaseModel):
     # system internal state
     summary: str | None = None
     pushed: bool = False
+    push_rss: bool = False  # 标记是否已推送到RSS
     filtered_out: bool = False  # 标记是否被LLM过滤器过滤掉

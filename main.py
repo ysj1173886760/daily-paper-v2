@@ -1,19 +1,33 @@
 from daily_paper.utils.logger import logger
 import argparse
-from daily_paper.flow.daily_paper_flow_v2 import run_daily_paper_flow_v2
+from daily_paper.flow.daily_paper_flow_v2 import (
+    run_daily_paper_flow_v2,
+    run_summary_only_flow,
+    run_publish_only_flow
+)
 from daily_paper.config import Config
 
 def main():
     """主入口函数"""
     parser = argparse.ArgumentParser(description='Daily Paper Processing System')
     parser.add_argument("--config_path", type=str, default="config/rag.yaml", help="配置文件路径")
+    parser.add_argument("--mode", type=str, choices=["full", "summary", "publish"], 
+                       default="full", help="运行模式: full(完整流程), summary(仅总结), publish(仅推送)")
     args = parser.parse_args()
 
     try:
         config = Config.from_yaml(args.config_path)
         
-        # 统一使用V2版本的流程（支持模板系统）
-        result = run_daily_paper_flow_v2(config)
+        # 根据模式选择对应的流程
+        if args.mode == "summary":
+            logger.info("=== 运行仅总结模式 ===")
+            result = run_summary_only_flow(config)
+        elif args.mode == "publish":
+            logger.info("=== 运行仅推送模式 ===")
+            result = run_publish_only_flow(config)
+        else:  # full
+            logger.info("=== 运行完整流程模式 ===")
+            result = run_daily_paper_flow_v2(config)
             
         # 输出执行结果摘要
         logger.info("=== 执行结果摘要 ===")
