@@ -51,7 +51,9 @@ def _create_rss_nodes(
     config: Config,
 ) -> tuple[GenerateHTMLNode, PublishRSSNode, DeployGitHubNode]:
     """创建RSS相关节点"""
-    generate_html_node = GenerateHTMLNode()
+    custom_tag = getattr(config, "rss_custom_tag", "")
+    
+    generate_html_node = GenerateHTMLNode(custom_tag=custom_tag)
     publish_rss_node = PublishRSSNode(
         site_url=getattr(
             config, "rss_site_url", "https://your-username.github.io/daily-papers-site"
@@ -60,6 +62,7 @@ def _create_rss_nodes(
         feed_description=getattr(
             config, "rss_feed_description", "Latest papers in AI research"
         ),
+        custom_tag=custom_tag,
     )
     deploy_github_node = DeployGitHubNode.create_from_config(config)
     return generate_html_node, publish_rss_node, deploy_github_node
@@ -94,120 +97,90 @@ def create_summary_only_flow(config: Config) -> Flow:
     logger.info("Summary-only Flow 创建完成")
     return flow
 
-
-def create_daily_paper_flow(config: Config) -> Flow:
-    """创建完整的论文处理流程"""
-    fetch_node, filter_node = _create_base_nodes(config)
-    process_node = _create_process_node_with_template(config)
+def create_push_feishu_flow(config: Config) -> Flow:
+    """创建仅进行飞书推送的流程"""
     push_node = _create_push_node_with_template(config)
-    generate_html_node, publish_rss_node, deploy_github_node = _create_rss_nodes(config)
-
-    # 完整流程：... -> push -> generate_html -> publish_rss -> deploy_github
-    if config.enable_llm_filter:
-        # 如果启用LLM过滤，在现有过滤后增加LLM过滤节点
-        llm_filter_node = FilterIrrelevantPapersNode(config)
-        (
-            fetch_node
-            >> filter_node
-            >> llm_filter_node
-            >> process_node
-            >> push_node
-            >> generate_html_node
-            >> publish_rss_node
-            >> deploy_github_node
-        )
-        logger.info("已启用LLM论文过滤功能")
-    else:
-        # 原有流程 + RSS发布 + GitHub部署
-        (
-            fetch_node
-            >> filter_node
-            >> process_node
-            >> push_node
-            >> generate_html_node
-            >> publish_rss_node
-            >> deploy_github_node
-        )
-        logger.info("未启用LLM论文过滤功能")
-
-    logger.info("已启用RSS发布和GitHub Pages部署功能")
-
-    flow = Flow(start=fetch_node)
-    logger.info("Daily Paper Processing Flow 创建完成")
-    return flow
-
-
-def create_publish_only_flow(config: Config) -> Flow:
-    """创建仅进行推送的流程（读取已总结的数据）"""
-    push_node = _create_push_node_with_template(config)
-    generate_html_node, publish_rss_node, deploy_github_node = _create_rss_nodes(config)
-
-    # 构建推送流程：push -> generate_html -> publish_rss -> deploy_github
-    # 每个节点都会自己处理状态和过滤
-    push_node >> generate_html_node >> publish_rss_node >> deploy_github_node
-
+    
     flow = Flow(start=push_node)
-    logger.info("Publish-only Flow 创建完成")
+    logger.info("Feishu-only Flow 创建完成")
     return flow
 
 
-def run_daily_paper_flow_v2(config: Config):
-    init_llm(config.llm_base_url, config.llm_api_key, config.llm_model)
-    init_feishu(config.feishu_webhook_url)
+def create_push_rss_flow(config: Config) -> Flow:
+    """创建仅进行RSS发布的流程"""
+    generate_html_node, publish_rss_node, deploy_github_node = _create_rss_nodes(config)
+    
+    # 构建RSS发布流程：generate_html -> publish_rss -> deploy_github
+    generate_html_node >> publish_rss_node >> deploy_github_node
+    
+    flow = Flow(start=generate_html_node)
+    logger.info("RSS-only Flow 创建完成")
+    return flow
 
+
+def run_summary_flow(config: Config):
     try:
         shared = {
             "paper_manager": PaperMetaManager(config.meta_file_path),
         }
-
-        flow = create_daily_paper_flow(config)
+        
+        flow = create_summary_only_flow(config)
         flow.run(shared)
-
-        return shared
 
     except Exception as e:
         logger.error(f"流程执行失败: {str(e)}")
         raise
 
+    logger.info(f"原始论文数: {len(shared.get('raw_papers', {}))}")
+    logger.info(f"新论文数: {len(shared.get('new_papers', {}))}")
+    logger.info(f"处理摘要数: {len(shared.get('summaries', {}))}")
 
-def run_summary_only_flow(config: Config):
-    """运行仅总结的流程"""
-    init_llm(config.llm_base_url, config.llm_api_key, config.llm_model)
+    return shared
 
+def run_push_feishu_flow(config: Config):
+    logger.info("开始运行飞书推送流程")
     try:
         shared = {
             "paper_manager": PaperMetaManager(config.meta_file_path),
         }
 
-        flow = create_summary_only_flow(config)
+        flow = create_push_feishu_flow(config)
         flow.run(shared)
 
-        return shared
+    except Exception as e:
+        logger.error(f"流程执行失败: {str(e)}")
+        raise
+    
+    logger.info(f"推送成功数: {len(shared.get('push_results', []))}")
+    return shared
+
+def run_push_rss_flow(config: Config):
+    logger.info("开始运行RSS发布流程")
+    try:
+        shared = {
+            "paper_manager": PaperMetaManager(config.meta_file_path),
+        }
+
+        flow = create_push_rss_flow(config)
+        flow.run(shared)
 
     except Exception as e:
-        logger.error(f"总结流程执行失败: {str(e)}")
+        logger.error(f"流程执行失败: {str(e)}")
         raise
+    
+    return shared
 
-
-def run_publish_only_flow(config: Config):
-    """运行仅推送的流程"""
+def run_daily_paper_flow_v2(config: Config):
     init_llm(config.llm_base_url, config.llm_api_key, config.llm_model)
     init_feishu(config.feishu_webhook_url)
 
-    try:
-        shared = {
-            "paper_manager": PaperMetaManager(config.meta_file_path),
-        }
+    run_summary_flow(config)
 
-        flow = create_publish_only_flow(config)
-        flow.run(shared)
+    if config.enable_feishu_push:
+      run_push_feishu_flow(config)
 
-        return shared
-
-    except Exception as e:
-        logger.error(f"推送流程执行失败: {str(e)}")
-        raise
-
+    if config.enable_rss_publish:
+      run_push_rss_flow(config)
 
 def reset_push_status_to_false(config: Config):
     paper_manager = PaperMetaManager(config.meta_file_path)
@@ -223,12 +196,7 @@ def reset_push_status_to_false(config: Config):
 
 # 导出函数
 __all__ = [
-    "create_daily_paper_flow",
-    "create_summary_only_flow",
-    "create_publish_only_flow",
     "run_daily_paper_flow_v2",
-    "run_summary_only_flow",
-    "run_publish_only_flow",
 ]
 
 if __name__ == "__main__":

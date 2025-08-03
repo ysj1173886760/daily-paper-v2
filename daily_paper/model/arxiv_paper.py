@@ -19,3 +19,4 @@ class ArxivPaper(BaseModel):
     pushed: bool = False
     push_rss: bool = False  # 标记是否已推送到RSS
     filtered_out: bool = False  # 标记是否被LLM过滤器过滤掉
+    rss_meta: str | None = None  # RSS元信息JSON字符串

@@ -23,6 +23,7 @@ class PublishRSSNode(Node):
         feed_title: str = "Daily AI Papers",
         feed_description: str = "Latest papers in AI research - RAG, Knowledge Graph, and more",
         max_items: int = 100,
+        custom_tag: str = "",
     ):
         super().__init__()
         self.output_dir = Path(output_dir)
@@ -31,46 +32,59 @@ class PublishRSSNode(Node):
         self.feed_title = feed_title
         self.feed_description = feed_description
         self.max_items = max_items
+        self.custom_tag = custom_tag
 
         # 确保输出目录存在
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def prep(self, shared):
-        """从共享存储获取HTML文件信息"""
+        """从共享存储获取HTML文件信息和RSS元数据"""
         html_files = shared.get("html_files", [])
         generation_date = shared.get("html_generation_date")
+        paper_manager = shared.get("paper_manager")
 
         if not html_files:
             logger.warning("没有找到生成的HTML文件")
             return {}
 
+        # 获取所有有RSS元信息的论文（用于增量合并）
+        all_rss_papers = []
+        if paper_manager:
+            all_papers_df = paper_manager.get_all_papers()
+            rss_papers_df = all_papers_df[
+                (all_papers_df["rss_meta"].notna()) & 
+                (all_papers_df["rss_meta"] != "")
+            ].copy()
+            
+            if not rss_papers_df.empty:
+                # 按update_time排序，最新的在前
+                rss_papers_df = rss_papers_df.sort_values("update_time", ascending=False)
+                all_rss_papers = rss_papers_df.to_dict("records")
+
         return {
             "html_files": html_files,
             "date": generation_date,
             "site_url": self.site_url,
+            "all_rss_papers": all_rss_papers,
         }
 
     def exec(self, prep_res):
-        """生成或更新RSS feed"""
-        if not prep_res.get("html_files"):
-            logger.warning("没有HTML文件可发布到RSS")
+        """基于rss_meta增量生成RSS feed"""
+        all_rss_papers = prep_res.get("all_rss_papers", [])
+        
+        if not all_rss_papers:
+            logger.warning("没有RSS元信息可发布")
             return {"success": False}
 
-        html_files = prep_res["html_files"]
-        date = prep_res["date"]
-
         try:
-            # 创建或加载现有的RSS feed
-            fg = self._create_or_load_feed()
+            # 创建新的RSS feed
+            fg = self._create_feed()
 
-            # 为每个HTML文件添加RSS条目
-            new_items_added = 0
-            for file_info in html_files:
-                if self._add_rss_item(fg, file_info, date):
-                    new_items_added += 1
-
-            # 限制最大条目数
-            self._limit_feed_items(fg)
+            # 基于所有rss_meta生成RSS条目（已按update_time排序）
+            total_items_added = 0
+            for paper_record in all_rss_papers[:self.max_items]:  # 限制最大条目数
+                if self._add_rss_item_from_meta(fg, paper_record):
+                    total_items_added += 1
 
             # 更新feed元数据
             fg.lastBuildDate(datetime.now(timezone.utc))
@@ -78,11 +92,11 @@ class PublishRSSNode(Node):
             # 保存RSS文件
             self._save_rss_feed(fg)
 
-            logger.info(f"RSS feed更新完成，新增 {new_items_added} 个条目")
+            logger.info(f"RSS feed生成完成，包含 {total_items_added} 个条目")
             return {
                 "success": True,
-                "new_items": new_items_added,
-                "total_items": len(fg.entry),
+                "new_items": len(prep_res.get("html_files", [])),  # 本次新增的
+                "total_items": total_items_added,
                 "rss_file": str(self.rss_file),
             }
 
@@ -103,8 +117,8 @@ class PublishRSSNode(Node):
 
         return "default"
 
-    def _create_or_load_feed(self) -> FeedGenerator:
-        """创建或加载现有的RSS feed"""
+    def _create_feed(self) -> FeedGenerator:
+        """创建新的RSS feed"""
         fg = FeedGenerator()
 
         # 设置feed基本信息
@@ -118,30 +132,23 @@ class PublishRSSNode(Node):
         fg.managingEditor("ai-research@example.com (AI Research Team)")
         fg.webMaster("webmaster@example.com (Webmaster)")
 
-        # 如果存在旧的RSS文件，尝试加载现有条目
-        if self.rss_file.exists():
-            try:
-                # 注意：feedgen不支持直接解析现有RSS，我们需要手动处理
-                # 这里简化处理，只保留基本的feed信息
-                logger.info(f"发现现有RSS文件: {self.rss_file}")
-            except Exception as e:
-                logger.warning(f"加载现有RSS文件失败: {e}，将创建新的feed")
-
         return fg
 
-    def _add_rss_item(self, fg: FeedGenerator, file_info: Dict, date: datetime) -> bool:
-        """为RSS feed添加新条目"""
+    def _add_rss_item_from_meta(self, fg: FeedGenerator, paper_record: dict) -> bool:
+        """基于rss_meta添加RSS条目"""
         try:
-            category = file_info["category"]
-            filename = file_info["filename"]
-            papers_count = file_info["papers_count"]
-            url = f"{self.site_url}{file_info['url']}"
-
+            import json
+            
+            # 解析RSS元信息
+            rss_meta = json.loads(paper_record["rss_meta"])
+            paper_id = paper_record["paper_id"]
+            update_time = paper_record["update_time"]
+            
             # 生成条目唯一ID
-            item_id = f"{self.site_url}/posts/{filename}"
+            item_id = f"{self.site_url}{rss_meta['url']}"
 
-            # 检查是否已存在相同ID的条目
-            for entry in fg.entry:
+            # 检查是否已存在相同ID的条目（避免重复）
+            for entry in fg.entry():
                 if entry.id() == item_id:
                     logger.debug(f"条目已存在，跳过: {item_id}")
                     return False
@@ -149,24 +156,77 @@ class PublishRSSNode(Node):
             # 创建新的RSS条目
             fe = fg.add_entry()
             fe.id(item_id)
-            fe.title(f"{date.strftime('%Y-%m-%d')} {category} Papers ({papers_count}篇)")
-            fe.link(href=url)
-            fe.description(f"今日{category}领域精选论文 {papers_count} 篇，包含详细分析和关键洞察。")
+            fe.title(rss_meta["title"])
+            fe.link(href=f"{self.site_url}{rss_meta['url']}")
+            fe.description(rss_meta["description"])
 
-            # 生成发布时间（使用当天的中午12点）
-            pub_date = datetime.combine(date, datetime.min.time().replace(hour=12))
-            pub_date = pub_date.replace(tzinfo=timezone.utc)
+            # 设置发布时间（使用update_time）
+            try:
+                if isinstance(update_time, str):
+                    pub_date = datetime.strptime(update_time, '%Y-%m-%d')
+                else:
+                    pub_date = datetime.combine(update_time, datetime.min.time())
+                pub_date = pub_date.replace(tzinfo=timezone.utc)
+            except:
+                pub_date = datetime.now(timezone.utc)
             fe.pubDate(pub_date)
 
             # 添加分类
-            fe.category(category)
-            fe.category("AI Research")
+            fe.category({'term': rss_meta["category"]})
+            if rss_meta["category"] != "AI Research":
+                fe.category({'term': 'AI Research'})
 
-            # 生成内容摘要（如果有的话）
-            content_summary = self._generate_content_summary(file_info, papers_count)
-            fe.content(content_summary, type="CDATA")
+            # 添加内容
+            fe.content(rss_meta["content"], type="CDATA")
 
-            logger.debug(f"添加RSS条目: {fe.title()}")
+            logger.debug(f"添加RSS条目: {rss_meta['title']}")
+            return True
+
+        except Exception as e:
+            logger.error(f"添加RSS条目失败: {e}")
+            return False
+
+    def _add_paper_rss_item(self, fg: FeedGenerator, file_info: Dict) -> bool:
+        """为RSS feed添加单篇论文条目"""
+        try:
+            paper_title = file_info["paper_title"]
+            filename = file_info["filename"]
+            url = f"{self.site_url}{file_info['url']}"
+            
+            # 生成条目唯一ID（使用paper_id确保唯一性）
+            item_id = f"{self.site_url}/posts/{filename}"
+
+            # 检查是否已存在相同ID的条目
+            for entry in fg.entry():
+                if entry.id() == item_id:
+                    logger.debug(f"条目已存在，跳过: {item_id}")
+                    return False
+
+            # 创建新的RSS条目
+            fe = fg.add_entry()
+            fe.id(item_id)
+            fe.title(paper_title)
+            fe.link(href=url)
+            fe.description(f"{self.custom_tag or 'AI'} 论文: {paper_title}")
+
+            # 生成发布时间
+            try:
+                pub_date = datetime.strptime(file_info["date"], '%Y-%m-%d')
+                pub_date = pub_date.replace(tzinfo=timezone.utc)
+            except:
+                pub_date = datetime.now(timezone.utc)
+            fe.pubDate(pub_date)
+
+            # 添加分类
+            if self.custom_tag:
+                fe.category({'term': self.custom_tag})
+            fe.category({'term': 'AI Research'})
+
+            # 添加论文摘要作为内容（如果有的话）
+            content = f"<h2>{paper_title}</h2><p>查看完整的论文分析和摘要。</p><p><a href=\"{url}\">阅读全文</a></p>"
+            fe.content(content, type="CDATA")
+
+            logger.debug(f"添加RSS条目: {paper_title}")
             return True
 
         except Exception as e:
@@ -199,10 +259,11 @@ class PublishRSSNode(Node):
 
     def _limit_feed_items(self, fg: FeedGenerator):
         """限制RSS feed的最大条目数"""
-        if len(fg.entry) > self.max_items:
+        if len(fg.entry()) > self.max_items:
             # 按发布时间排序，保留最新的条目
-            fg.entry.sort(key=lambda e: e.pubDate(), reverse=True)
-            fg.entry = fg.entry[: self.max_items]
+            entries = fg.entry()
+            entries.sort(key=lambda e: e.pubDate(), reverse=True)
+            fg.entry(entries[: self.max_items], replace=True)
             logger.info(f"RSS条目已限制为最新 {self.max_items} 条")
 
     def _save_rss_feed(self, fg: FeedGenerator):

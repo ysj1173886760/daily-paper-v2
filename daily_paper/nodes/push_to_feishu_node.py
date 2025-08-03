@@ -6,21 +6,11 @@ from daily_paper.utils.logger import logger
 import pandas as pd
 from pocketflow import Node
 from daily_paper.utils.arxiv_client import ArxivPaper
-from daily_paper.utils.data_manager import PaperMetaManager
+from daily_paper.utils.data_manager import PaperMetaManager, is_valid_summary
 from daily_paper.utils.feishu_client import send_paper_to_feishu
 
 from typing import Callable
 
-
-def is_valid_summary(summary) -> bool:
-    """检查summary是否有效（不为空且有实际内容）"""
-    # 检查是否为None或NaN
-    if summary is None or pd.isna(summary):
-        return False
-
-    # 转换为字符串并检查内容
-    summary_str = str(summary).strip()
-    return summary_str != "" and summary_str != "None"
 
 
 class PushToFeishuNode(Node):
@@ -34,7 +24,6 @@ class PushToFeishuNode(Node):
         """获取需要推送的论文"""
         paper_manager: PaperMetaManager = shared.get("paper_manager")
 
-        # 获取有摘要但未推送且未被过滤的论文
         all_papers = paper_manager.get_all_papers()
         to_push = all_papers.loc[
             all_papers["summary"].apply(is_valid_summary)

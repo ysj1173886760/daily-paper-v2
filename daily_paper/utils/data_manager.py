@@ -37,6 +37,23 @@ class PaperMetaManager:
         try:
             df = pd.read_parquet(self.meta_file)
             logger.info(f"从{self.meta_file}加载了{len(df)}篇论文")
+            
+            # 优化：检查列差异并添加缺失的列
+            model_fields = set(ArxivPaper.model_fields.keys())
+            df_columns = set(df.columns)
+            
+            # 找出model中有但df中缺失的列
+            missing_columns = model_fields - df_columns
+            
+            if missing_columns:
+                logger.info(f"检测到缺失的列: {missing_columns}, 将添加并设置为None")
+                for column in missing_columns:
+                    df[column] = None
+                
+                # 按model字段顺序重新排列列
+                df = df.reindex(columns=list(model_fields))
+                logger.info(f"已添加 {len(missing_columns)} 个缺失列并重新排序")
+            
             return df
         except Exception as e:
             logger.error(f"Error loading {self.meta_file}: {str(e)}")
@@ -166,34 +183,14 @@ class PaperMetaManager:
             return None
         return matches.iloc[0].get("summary")
 
-    def get_papers_with_summaries(
-        self, unpushed_only: bool = False, unpushed_rss_only: bool = False
-    ) -> pd.DataFrame:
-        """
-        获取有总结的论文
 
-        Args:
-            unpushed_only: 只返回未推送到Feishu的论文
-            unpushed_rss_only: 只返回未推送到RSS的论文
+def is_valid_summary(summary) -> bool:
+    if summary is None or pd.isna(summary):
+        return False
 
-        Returns:
-            过滤后的DataFrame
-        """
-        if self.df.empty:
-            return pd.DataFrame()
-
-        # 过滤有总结的论文
-        has_summary = self.df["summary"].notna() & (self.df["summary"] != "")
-        result = self.df[has_summary].copy()
-
-        if unpushed_only:
-            result = result[result["pushed"] == False]
-
-        if unpushed_rss_only:
-            result = result[result["push_rss"] == False]
-
-        return result
-
+    # 转换为字符串并检查内容
+    summary_str = str(summary).strip()
+    return summary_str != "" and summary_str != "None"
 
 if __name__ == "__main__":
     # 测试PaperMetaManager

@@ -28,11 +28,16 @@ class Config(BaseModel):
     rss_feed_description: str = (
         "Latest papers in AI research - RAG, Knowledge Graph, and more"
     )
+    rss_custom_tag: str = ""  # 自定义标签，用于替代按领域分类
 
     # GitHub Pages部署配置
     github_token: str = ""  # GitHub Personal Access Token
     github_repo_owner: str = ""  # GitHub用户名
     github_repo_name: str = "daily-papers-site"  # 网站仓库名
+    
+    # 发布选项配置
+    enable_feishu_push: bool = False  # 是否启用飞书推送
+    enable_rss_publish: bool = False  # 是否启用RSS发布
 
     @classmethod
     def from_yaml(cls, yaml_path: str):
