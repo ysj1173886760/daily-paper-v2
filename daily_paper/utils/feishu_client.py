@@ -9,7 +9,7 @@ from daily_paper.utils.logger import logger
 import os
 from typing import Dict, Any
 from tenacity import retry, wait_exponential, stop_after_attempt
-from .arxiv_client import ArxivPaper
+from daily_paper.model.arxiv_paper import ArxivPaper
 
 FEISHU_WEBHOOK_URL = None
 
@@ -19,7 +19,7 @@ def init_feishu(feishu_webhook_url: str):
     FEISHU_WEBHOOK_URL = feishu_webhook_url
 
 
-@retry(stop=stop_after_attempt(100), wait=wait_exponential(multiplier=1, min=1, max=10))
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=10))
 def send_to_feishu_with_retry(message: Dict[str, Any]) -> None:
     """
     带重试机制的飞书消息推送
@@ -31,10 +31,17 @@ def send_to_feishu_with_retry(message: Dict[str, Any]) -> None:
         Exception: 推送失败时抛出异常
     """
     if not FEISHU_WEBHOOK_URL:
+        logger.error("飞书Webhook地址未配置")
         raise ValueError("飞书Webhook地址未配置")
 
     response = requests.post(FEISHU_WEBHOOK_URL, json=message, timeout=10)
-    response.raise_for_status()
+
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"飞书推送失败: {str(e)}")
+        raise
+
 
 
 def send_paper_to_feishu(paper: ArxivPaper, summary: str) -> bool:
@@ -82,49 +89,6 @@ def send_paper_to_feishu(paper: ArxivPaper, summary: str) -> bool:
     except Exception as e:
         logger.error(f"飞书推送失败: {str(e)}")
         return False
-
-
-def send_daily_report_to_feishu(report_content: str, target_date: str) -> bool:
-    """
-    发送日报到飞书
-
-    Args:
-        report_content: 日报内容
-        target_date: 目标日期
-
-    Returns:
-        是否发送成功
-    """
-    if not FEISHU_WEBHOOK_URL:
-        logger.error("飞书Webhook地址未配置")
-        return False
-
-    message = {
-        "msg_type": "interactive",
-        "card": {
-            "elements": [
-                {
-                    "tag": "div",
-                    "text": {
-                        "content": f"📅 AI论文简报({target_date})\n\n{report_content}",
-                        "tag": "lark_md",
-                    },
-                }
-            ],
-            "header": {
-                "title": {"content": f"{target_date} 论文日报", "tag": "plain_text"}
-            },
-        },
-    }
-
-    try:
-        send_to_feishu_with_retry(message)
-        logger.info(f"飞书日报推送成功: {target_date}")
-        return True
-    except Exception as e:
-        logger.error(f"飞书日报推送失败: {str(e)}")
-        return False
-
 
 if __name__ == "__main__":
     # 测试函数
