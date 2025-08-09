@@ -30,6 +30,7 @@ class AnalyzeAndRecommendPapersNode(Node):
         """准备阶段：从shared获取昨日论文"""
         yesterday_papers = shared.get("yesterday_papers", [])
         target_date = shared.get("target_date")
+        config = shared.get("config")
         
         if not yesterday_papers:
             raise ValueError("yesterday_papers not found in shared store")
@@ -37,10 +38,15 @@ class AnalyzeAndRecommendPapersNode(Node):
         if not target_date:
             raise ValueError("target_date not found in shared store")
         
+        # 使用配置文件中的推荐数量，如果配置存在的话
+        recommendation_count = self.recommendation_count
+        if config and hasattr(config, 'daily_summary_recommendation_count'):
+            recommendation_count = config.daily_summary_recommendation_count
+        
         return {
             "papers": yesterday_papers,
             "target_date": target_date,
-            "recommendation_count": self.recommendation_count
+            "recommendation_count": recommendation_count
         }
     
     def exec(self, prep_res):

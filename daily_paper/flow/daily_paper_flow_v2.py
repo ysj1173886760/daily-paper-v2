@@ -10,11 +10,11 @@ from daily_paper.nodes import (
     DeployGitHubNode,
 )
 from daily_paper.utils.call_llm import init_llm
-from daily_paper.utils.feishu_client import init_feishu
 from daily_paper.utils.logger import logger
 from daily_paper.utils.data_manager import PaperMetaManager
 from daily_paper.config import Config
 from daily_paper.templates import get_template
+from daily_paper.flow.daily_summary_flow import DailySummaryRunner
 
 
 def _create_process_node_with_template(config: Config) -> ProcessPapersV2Node:
@@ -122,6 +122,7 @@ def run_summary_flow(config: Config):
     try:
         shared = {
             "paper_manager": PaperMetaManager(config.meta_file_path),
+            "config": config
         }
         
         flow = create_summary_only_flow(config)
@@ -142,6 +143,7 @@ def run_push_feishu_flow(config: Config):
     try:
         shared = {
             "paper_manager": PaperMetaManager(config.meta_file_path),
+            "config": config
         }
 
         flow = create_push_feishu_flow(config)
@@ -159,6 +161,7 @@ def run_push_rss_flow(config: Config):
     try:
         shared = {
             "paper_manager": PaperMetaManager(config.meta_file_path),
+            "config": config
         }
 
         flow = create_push_rss_flow(config)
@@ -170,17 +173,49 @@ def run_push_rss_flow(config: Config):
     
     return shared
 
+def run_daily_summary_batch(config: Config):
+    """运行每日汇总批量处理"""
+    if not config.daily_summary_enabled:
+        logger.info("每日汇总功能未启用，跳过")
+        return
+    
+    logger.info("开始运行每日汇总批量处理")
+    
+    try:
+        # 创建shared数据，包含配置信息
+        shared = {
+            "paper_manager": PaperMetaManager(config.meta_file_path),
+            "config": config
+        }
+        
+        # 运行批量处理
+        runner = DailySummaryRunner(tracker_file=config.daily_summary_tracker_file)
+        result = runner.run_batch(shared, max_days=config.daily_summary_max_days)
+        
+        # 显示结果
+        if result['success']:
+            logger.info(f"每日汇总批量处理完成，成功处理 {result['total_processed']} 天")
+        else:
+            logger.error(f"每日汇总批量处理失败: {result.get('error', '未知错误')}")
+            
+    except Exception as e:
+        logger.error(f"每日汇总批量处理异常: {str(e)}")
+
+
 def run_daily_paper_flow_v2(config: Config):
     init_llm(config.llm_base_url, config.llm_api_key, config.llm_model)
-    init_feishu(config.feishu_webhook_url)
 
+    # 运行主要的论文处理流程
     run_summary_flow(config)
 
     if config.enable_feishu_push:
-      run_push_feishu_flow(config)
+        run_push_feishu_flow(config)
 
     if config.enable_rss_publish:
-      run_push_rss_flow(config)
+        run_push_rss_flow(config)
+    
+    # 运行每日汇总批量处理（如果启用）
+    run_daily_summary_batch(config)
 
 def reset_push_status_to_false(config: Config):
     paper_manager = PaperMetaManager(config.meta_file_path)

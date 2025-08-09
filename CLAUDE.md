@@ -38,17 +38,19 @@ Built using PocketFlow framework following the "Graph + Shared Store" pattern:
 
 ## Usage
 ```bash
-# Run full workflow (default)
-python main.py --config_path config/rag.yaml --mode full
+# Run with default config (rag.yaml)
+python main.py
 
-# Run summary-only workflow (fetch + filter + process, no pushing)
-python main.py --config_path config/rag.yaml --mode summary
+# Run with specific config
+python main.py --config_path config/rag.yaml
+python main.py --config_path config/kg.yaml
+python main.py --config_path config/test.yaml
 
-# Run publish-only workflow (push existing summaries to Feishu/RSS/GitHub)
-python main.py --config_path config/rag.yaml --mode publish
-
-# Available configs: rag.yaml, kg.yaml, test.yaml
-# Available modes: full (default), summary, publish
+# All functionality is now controlled through configuration files:
+# - enable_feishu_push: Control individual paper pushing
+# - enable_rss_publish: Control RSS feed generation  
+# - daily_summary_enabled: Control daily summary reports
+# - daily_summary_feishu_webhook_url: Separate webhook for summaries
 ```
 
 # Agentic Coding: Humans Design, Agents code!

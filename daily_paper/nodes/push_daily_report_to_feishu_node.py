@@ -8,22 +8,29 @@ from typing import List, Dict, Any
 from pocketflow import Node
 from daily_paper.model.arxiv_paper import ArxivPaper
 from daily_paper.utils.logger import logger
-from daily_paper.utils.feishu_client import send_to_feishu_with_retry
+from daily_paper.utils.feishu_client import FeishuClient
 from daily_paper.utils.date_helper import format_date_chinese
 
 
 class PushDailyReportToFeishuNode(Node):
     """格式化并推送日报到飞书的节点"""
     
-    def __init__(self):
-        """初始化节点"""
+    def __init__(self, feishu_client: FeishuClient = None):
+        """
+        初始化节点
+        
+        Args:
+            feishu_client: 飞书客户端，如果不提供则从配置中创建
+        """
         super().__init__(max_retries=2, wait=3)
+        self.feishu_client = feishu_client
     
     def prep(self, shared):
         """准备阶段：从shared获取分析结果和论文数据"""
         analysis_and_recommendations = shared.get("analysis_and_recommendations")
         yesterday_papers = shared.get("yesterday_papers", [])
         target_date = shared.get("target_date")
+        config = shared.get("config")
         
         if not analysis_and_recommendations:
             raise ValueError("analysis_and_recommendations not found in shared store")
@@ -31,10 +38,29 @@ class PushDailyReportToFeishuNode(Node):
         if not target_date:
             raise ValueError("target_date not found in shared store")
         
+        # 获取飞书客户端
+        feishu_client = self.feishu_client
+        if not feishu_client and config:
+            # 优先使用每日汇总专用的webhook URL
+            webhook_url = None
+            if hasattr(config, 'daily_summary_feishu_webhook_url') and config.daily_summary_feishu_webhook_url:
+                webhook_url = config.daily_summary_feishu_webhook_url
+                logger.info("使用每日汇总专用的飞书webhook URL")
+            elif hasattr(config, 'feishu_webhook_url') and config.feishu_webhook_url:
+                webhook_url = config.feishu_webhook_url
+                logger.info("使用默认的飞书webhook URL")
+            
+            if webhook_url:
+                feishu_client = FeishuClient(webhook_url)
+        
+        if not feishu_client:
+            raise ValueError("飞书客户端未配置，请传入 feishu_client 或在 config 中设置 feishu_webhook_url")
+        
         return {
             "analysis_result": analysis_and_recommendations,
             "papers": yesterday_papers,
-            "target_date": target_date
+            "target_date": target_date,
+            "feishu_client": feishu_client
         }
     
     def exec(self, prep_res):
@@ -42,6 +68,7 @@ class PushDailyReportToFeishuNode(Node):
         analysis_result = prep_res["analysis_result"]
         papers = prep_res["papers"]
         target_date = prep_res["target_date"]
+        feishu_client = prep_res["feishu_client"]
         
         logger.info("开始格式化日报并推送到飞书")
         
@@ -50,15 +77,15 @@ class PushDailyReportToFeishuNode(Node):
         
         # 推送到飞书
         try:
-            # 构建飞书消息格式
-            feishu_message = self._build_feishu_message(report_content)
-            result = send_to_feishu_with_retry(feishu_message)
-            logger.info("日报已成功推送到飞书")
-            return {
-                "success": True,
-                "result": result,
-                "content": report_content
-            }
+            success = feishu_client.send_daily_report(report_content)
+            if success:
+                logger.info("日报已成功推送到飞书")
+                return {
+                    "success": True,
+                    "content": report_content
+                }
+            else:
+                raise Exception("飞书客户端返回推送失败")
         except Exception as e:
             logger.error(f"推送到飞书失败: {str(e)}")
             raise
@@ -74,23 +101,6 @@ class PushDailyReportToFeishuNode(Node):
         
         return "default"
     
-    def _build_feishu_message(self, report_content: str) -> Dict[str, Any]:
-        """构建飞书消息格式"""
-        return {
-            "msg_type": "interactive",
-            "card": {
-                "elements": [
-                    {
-                        "tag": "div",
-                        "text": {
-                            "content": report_content,
-                            "tag": "lark_md",
-                        },
-                    }
-                ],
-                "header": {"title": {"content": "📊 AI论文日报", "tag": "plain_text"}},
-            },
-        }
     
     def _format_daily_report(self, analysis_result: Dict[str, Any], papers: List[ArxivPaper], target_date) -> str:
         """格式化日报内容"""
@@ -122,7 +132,7 @@ class PushDailyReportToFeishuNode(Node):
                 paper = self._find_paper_by_id(papers, rec["paper_id"])
                 
                 report_lines.extend([
-                    f"### {i}. {rec['title']}",
+                    f"### {i}. **{rec['title']}**",
                     f"**论文介绍**: {rec.get('description', '暂无详细介绍')}",
                     f"**推荐理由**: {rec['reason']}",
                     f"**核心亮点**: {' | '.join(rec['highlights'])}",
@@ -130,7 +140,9 @@ class PushDailyReportToFeishuNode(Node):
                 
                 if paper:
                     report_lines.extend([
-                        f"**链接**: {paper.paper_url}",
+                        f"**作者**: {paper.paper_first_author}",
+                        f"**分类**: {paper.primary_category}",
+                        f"**链接**: [{paper.paper_id}]({paper.paper_url})",
                     ])
                     
                 report_lines.append("")
@@ -175,11 +187,11 @@ class PushDailyReportToFeishuNode(Node):
             simple_report += f"   - 链接: {paper.paper_url}\n\n"
         
         try:
-            feishu_message = self._build_feishu_message(simple_report)
-            result = send_to_feishu_with_retry(feishu_message)
+            # 使用准备阶段创建的飞书客户端
+            feishu_client = prep_res["feishu_client"]
+            success = feishu_client.send_daily_report(simple_report, "📊 AI论文日报（简化版）")
             return {
-                "success": True,
-                "result": result,
+                "success": success,
                 "content": simple_report,
                 "fallback": True
             }

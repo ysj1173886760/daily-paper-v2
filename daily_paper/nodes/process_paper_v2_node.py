@@ -118,6 +118,12 @@ class ProcessPapersV2Node(Node):
 
         # 获取没有摘要且未被过滤的论文
         all_papers = paper_manager.get_all_papers()
+        # 处理filtered_out列可能为None的情况
+        if "filtered_out" in all_papers.columns:
+            all_papers["filtered_out"] = all_papers["filtered_out"].fillna(False)
+        else:
+            all_papers["filtered_out"] = False
+        
         papers_without_summary = all_papers.loc[
             (all_papers["summary"].isna()) & (~all_papers["filtered_out"])
         ]
@@ -189,6 +195,7 @@ class ProcessPapersV2Node(Node):
         for paper_id, summary in exec_res:
             update_dict[paper_id] = {
                 "summary": summary,
+                "template": self.template_name,  # 记录使用的模板名称
             }
 
         paper_manager: PaperMetaManager = shared.get("paper_manager")
@@ -201,5 +208,5 @@ class ProcessPapersV2Node(Node):
 
         shared["summaries"] = exec_res
 
-        logger.info(f"批量更新了{len(exec_res)}篇论文摘要")
+        logger.info(f"批量更新了{len(exec_res)}篇论文摘要，使用模板: {self.template_name}")
         return "default"

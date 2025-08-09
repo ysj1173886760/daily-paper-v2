@@ -40,16 +40,19 @@ class GenerateHTMLNode(Node):
 
         logger.info(f"需要生成HTML的论文数量: {len(to_generate_html_papers)}")
 
-        # 转换为字典格式
+        # 转换为字典格式，包含模板信息
         papers_dict = {}
         for _, row in to_generate_html_papers.iterrows():
             paper_id = row["paper_id"]
-            papers_dict[paper_id] = ArxivPaper(**row.to_dict())
+            paper_data = row.to_dict()
+            papers_dict[paper_id] = {
+                "paper": ArxivPaper(**paper_data),
+                "template": row.get("template", "v2")  # 获取论文的模板信息
+            }
 
         return {
             "papers": papers_dict,
             "date": datetime.now().date(),
-            "template_name": getattr(shared, "template_name", "v2"),
             "paper_manager": paper_manager,
         }
 
@@ -57,12 +60,14 @@ class GenerateHTMLNode(Node):
         """生成HTML页面"""
         papers = prep_res["papers"]
         date = prep_res["date"]
-        template_name = prep_res.get("template_name", "v2")
 
         generated_files = []
 
         # 为每篇论文生成单独的HTML文件
-        for paper_id, paper in papers.items():
+        for paper_id, paper_info in papers.items():
+            paper = paper_info["paper"]
+            template_name = paper_info["template"]
+            
             # 生成HTML内容
             html_content = self._generate_single_paper_html(paper, date, template_name)
 
@@ -81,11 +86,12 @@ class GenerateHTMLNode(Node):
             rss_meta = {
                 "title": paper.paper_title,
                 "url": f"/posts/{filename}",
-                "description": f"{self.custom_tag or 'AI'} 论文: {paper.paper_title}",
+                "description": f"{self.custom_tag or 'AI'} 论文: {paper.paper_title} (模板: {template_name.upper()})",
                 "category": self.custom_tag or "AI Research",
                 "pub_date": update_date,
-                "content": f"<h2>{paper.paper_title}</h2><p>查看完整的论文分析和摘要。</p><p><a href=\"{'/posts/' + filename}\">阅读全文</a></p>",
-                "filename": filename
+                "content": f"<h2>{paper.paper_title}</h2><p>使用{template_name.upper()}模板分析的论文摘要。</p><p><a href=\"{'/posts/' + filename}\">阅读全文</a></p>",
+                "filename": filename,
+                "template": template_name
             }
             
             generated_files.append(
@@ -97,11 +103,12 @@ class GenerateHTMLNode(Node):
                     "url": f"/posts/{filename}",
                     "custom_tag": self.custom_tag,
                     "date": update_date,  # 使用update_time作为日期
+                    "template": template_name,
                     "rss_meta": json.dumps(rss_meta, ensure_ascii=False)
                 }
             )
 
-            logger.info(f"生成HTML文件: {filename} (论文: {paper.paper_title[:50]}...)")
+            logger.info(f"生成HTML文件: {filename} (论文: {paper.paper_title[:50]}...) 使用模板: {template_name}")
 
         return {"success": True, "files": generated_files, "date": date}
 

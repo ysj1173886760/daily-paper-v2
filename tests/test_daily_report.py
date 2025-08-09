@@ -15,7 +15,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from daily_paper.config import Config
 from daily_paper.flow.daily_report_flow import run_daily_report_with_config
 from daily_paper.utils.call_llm import init_llm
-from daily_paper.utils.feishu_client import init_feishu
 from daily_paper.utils.logger import logger
 from daily_paper.utils.date_helper import get_yesterday_date, format_date_chinese
 
@@ -29,10 +28,9 @@ def main():
         config = Config.from_yaml("config/test.yaml")
         print(f"✓ 配置加载成功")
         
-        # 初始化LLM和飞书客户端
+        # 初始化LLM
         init_llm(config.llm_base_url, config.llm_api_key, config.llm_model)
-        init_feishu(config.feishu_webhook_url)
-        print(f"✓ LLM和飞书客户端初始化完成")
+        print(f"✓ LLM初始化完成")
         
         # 默认使用昨天日期
         target_date = get_yesterday_date()
@@ -109,7 +107,6 @@ def test_with_specific_date():
         
         # 初始化服务
         init_llm(config.llm_base_url, config.llm_api_key, config.llm_model)
-        init_feishu(config.feishu_webhook_url)
         
         print(f"🎯 测试日期: {format_date_chinese(target_date)}")
         

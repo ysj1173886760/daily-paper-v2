@@ -32,16 +32,14 @@ python test_daily_report.py --config config/kg.yaml
 from daily_paper.config import Config
 from daily_paper.flow.daily_report_flow import run_daily_report_with_config
 from daily_paper.utils.call_llm import init_llm
-from daily_paper.utils.feishu_client import init_feishu
 
 # 加载配置
 config = Config.from_yaml("config/rag.yaml")
 
 # 初始化服务
 init_llm(config.llm_base_url, config.llm_api_key, config.llm_model)
-init_feishu(config.feishu_webhook_url)
 
-# 运行日报流程
+# 运行日报流程（FeishuClient会自动从配置创建）
 result = run_daily_report_with_config(config)
 
 # 查看结果

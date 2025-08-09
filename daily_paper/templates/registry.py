@@ -7,6 +7,7 @@ from .base import PaperAnalysisTemplate
 from .v1_template import V1Template
 from .v2_template import V2Template
 from .simple_template import SimpleTemplate
+from .analysis_template import FastAnalysisTemplate
 
 
 class TemplateRegistry:
@@ -24,6 +25,7 @@ class TemplateRegistry:
         cls.register("simple", SimpleTemplate)
         cls.register("v1", V1Template)
         cls.register("v2", V2Template)
+        cls.register("fast_analysis", FastAnalysisTemplate)
         cls._initialized = True
 
     @classmethod

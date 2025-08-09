@@ -27,14 +27,17 @@ class FetchYesterdayPapersNode(Node):
         self.target_date = target_date or get_yesterday_date()
     
     def prep(self, shared):
-        """准备阶段：从shared获取paper_manager"""
+        """准备阶段：从shared获取paper_manager和目标日期"""
         paper_manager = shared.get("paper_manager")
         if not paper_manager:
             raise ValueError("paper_manager not found in shared store")
         
+        # 优先使用shared中的target_date，其次使用初始化时的target_date
+        target_date = shared.get("target_date", self.target_date)
+        
         return {
             "paper_manager": paper_manager,
-            "target_date": self.target_date
+            "target_date": target_date
         }
     
     def exec(self, prep_res):

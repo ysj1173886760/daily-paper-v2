@@ -13,6 +13,10 @@ def main():
 
     try:
         config = Config.from_yaml(args.config_path)
+        logger.info(f"加载配置文件: {args.config_path}")
+        logger.info(f"系统配置: 飞书推送={config.enable_feishu_push}, RSS发布={config.enable_rss_publish}, 每日汇总={config.daily_summary_enabled}")
+        
+        # 运行完整的工作流，各功能模块通过配置控制启用/禁用
         run_daily_paper_flow_v2(config)
         
     except Exception as e:
