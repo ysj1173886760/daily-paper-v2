@@ -134,7 +134,7 @@ def extract_text_from_pdf(pdf_path: str, max_paper_text_length) -> str:
                     f"PyMuPDF错误: {str(fitz_error)}"
                 )
                 logger.error(error_msg)
-                return ""
+                raise
 
 
 def process_paper_pdf(
@@ -159,7 +159,7 @@ def process_paper_pdf(
 
     # 下载PDF
     if not download_paper(pdf_url, paper_id, save_dir):
-        return ""
+        raise RuntimeError("download failed")
 
     # 提取文本
     pdf_path = os.path.join(save_dir, f"{paper_id}.pdf")

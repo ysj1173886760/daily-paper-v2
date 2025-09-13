@@ -66,10 +66,6 @@ def process_single_paper_with_generator(
     logger.info(f"开始处理论文: {paper.paper_id}")
     paper_text = process_paper_pdf(paper.paper_url, paper.paper_id)
 
-    if not paper_text:
-        logger.warning(f"无法提取论文文本: {paper.paper_id}")
-        return paper.paper_id, "无法提取论文文本"
-
     # 使用自定义generator生成摘要
     summary = summary_generator(paper_text)
     logger.info(f"已生成摘要: {paper.paper_id}")
