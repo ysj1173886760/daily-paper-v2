@@ -9,7 +9,7 @@ from pocketflow import Node
 from daily_paper.model.arxiv_paper import ArxivPaper
 from daily_paper.utils.data_manager import PaperMetaManager
 from daily_paper.utils.pdf_processor import process_paper_pdf
-from daily_paper.utils.call_llm import call_llm
+from daily_paper.utils.call_llm import LLM
 from daily_paper.templates import get_template, PaperAnalysisTemplate
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
@@ -18,7 +18,7 @@ import yaml
 
 
 def analyze_paper_with_template(
-    paper_text: str, template: PaperAnalysisTemplate
+    paper_text: str, template: PaperAnalysisTemplate, llm: LLM
 ) -> str:
     """
     使用指定模板分析论文
@@ -31,11 +31,11 @@ def analyze_paper_with_template(
         结构化分析结果（字符串形式，用于存储在summary字段）
     """
     prompt = template.generate_prompt(paper_text)
-    response = call_llm(prompt)
+    response = llm.chat(prompt)
     return template.parse_response(response)
 
 
-def analyze_paper_v2(paper_text):
+def analyze_paper_v2(paper_text, llm: LLM):
     """
     论文深度分析（V2版本）- 保持向后兼容性
 
@@ -47,11 +47,11 @@ def analyze_paper_v2(paper_text):
     """
     # 默认使用V2模板保持向后兼容
     template = get_template("v2")
-    return analyze_paper_with_template(paper_text, template)
+    return analyze_paper_with_template(paper_text, template, llm)
 
 
 def process_single_paper_with_generator(
-    paper: ArxivPaper, summary_generator
+    paper: ArxivPaper, summary_generator, llm: LLM
 ) -> tuple[str, str]:
     """
     处理单篇论文的完整流程：下载PDF + 使用自定义generator生成摘要
@@ -67,7 +67,7 @@ def process_single_paper_with_generator(
     paper_text = process_paper_pdf(paper.paper_url, paper.paper_id)
 
     # 使用自定义generator生成摘要
-    summary = summary_generator(paper_text)
+    summary = summary_generator(paper_text, llm)
     logger.info(f"已生成摘要: {paper.paper_id}")
 
     return paper.paper_id, summary
@@ -95,16 +95,16 @@ class ProcessPapersV2Node(Node):
 
         try:
             template = get_template(template_name)
-            self.summary_generator = lambda paper_text: analyze_paper_with_template(
-                paper_text, template
+            self.summary_generator = lambda paper_text, llm: analyze_paper_with_template(
+                paper_text, template, llm
             )
             logger.info(f"使用模板: {template_name} ({template.description})")
         except ValueError as e:
             logger.error(f"模板错误: {e}")
             # 回退到默认V2模板
             template = get_template("v2")
-            self.summary_generator = lambda paper_text: analyze_paper_with_template(
-                paper_text, template
+            self.summary_generator = lambda paper_text, llm: analyze_paper_with_template(
+                paper_text, template, llm
             )
             logger.warning("回退到默认V2模板")
 
@@ -146,10 +146,15 @@ class ProcessPapersV2Node(Node):
             logger.info(f"使用分析模板: {self.template_name}")
         else:
             logger.info(f"使用摘要生成器: {self.summary_generator.__name__}")
-        return papers
+        # 从 shared 获取 LLM 实例
+        llm: LLM = shared.get("llm")
+        if llm is None:
+            raise RuntimeError("LLM instance not found in shared store. Please set shared['llm'] before running.")
+        return papers, llm
 
-    def exec(self, papers):
+    def exec(self, prep_res):
         """并行处理所有论文"""
+        papers, llm = prep_res
         if not papers:
             logger.info("没有需要处理的论文")
             return []
@@ -159,7 +164,7 @@ class ProcessPapersV2Node(Node):
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = [
                 executor.submit(
-                    process_single_paper_with_generator, paper, self.summary_generator
+                    process_single_paper_with_generator, paper, self.summary_generator, llm
                 )
                 for paper in papers
             ]

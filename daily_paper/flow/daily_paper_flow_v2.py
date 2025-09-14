@@ -8,8 +8,9 @@ from daily_paper.nodes import (
     GenerateHTMLNode,
     PublishRSSNode,
     DeployGitHubNode,
+    FetchPapersBulkNode,
 )
-from daily_paper.utils.call_llm import init_llm
+from daily_paper.utils.call_llm import LLM, AsyncLLM
 from daily_paper.utils.logger import logger
 from daily_paper.utils.data_manager import PaperMetaManager
 from daily_paper.config import Config
@@ -72,9 +73,17 @@ def _create_base_nodes(
     config: Config,
 ) -> tuple[FetchPapersNode, FilterExistingPapersNode]:
     """创建基础节点（fetch和filter）"""
-    fetch_node = FetchPapersNode(
-        config.arxiv_topic_list, config.arxiv_search_offset, config.arxiv_search_limit
-    )
+    mode = getattr(config, "arxiv_search_mode", "api")
+    if mode == "bulk":
+        # Bulk/local mode uses the new node which reads config.arxiv_bulk
+        fetch_node = FetchPapersBulkNode()
+        logger.info("Using bulk/local fetch mode (FetchPapersBulkNode)")
+    else:
+        # Default API mode
+        fetch_node = FetchPapersNode(
+            config.arxiv_topic_list, config.arxiv_search_offset, config.arxiv_search_limit
+        )
+        logger.info("Using API fetch mode (FetchPapersNode)")
     filter_node = FilterExistingPapersNode()
     return fetch_node, filter_node
 
@@ -120,9 +129,15 @@ def create_push_rss_flow(config: Config) -> Flow:
 
 def run_summary_flow(config: Config):
     try:
+        # 创建 LLM 实例并注入 shared
+        llm = LLM(config.llm_base_url, config.llm_api_key, config.llm_model)
+        async_llm = AsyncLLM(config.llm_base_url, config.llm_api_key, config.llm_model)
+
         shared = {
             "paper_manager": PaperMetaManager(config.meta_file_path),
-            "config": config
+            "config": config,
+            "llm": llm,
+            "async_llm": async_llm,
         }
         
         flow = create_summary_only_flow(config)
@@ -182,10 +197,15 @@ def run_daily_summary_batch(config: Config):
     logger.info("开始运行每日汇总批量处理")
     
     try:
-        # 创建shared数据，包含配置信息
+        # 创建shared数据，包含配置信息和LLM实例
+        llm = LLM(config.llm_base_url, config.llm_api_key, config.llm_model)
+        async_llm = AsyncLLM(config.llm_base_url, config.llm_api_key, config.llm_model)
+
         shared = {
             "paper_manager": PaperMetaManager(config.meta_file_path),
-            "config": config
+            "config": config,
+            "llm": llm,
+            "async_llm": async_llm,
         }
         
         # 运行批量处理
@@ -203,9 +223,8 @@ def run_daily_summary_batch(config: Config):
 
 
 def run_daily_paper_flow_v2(config: Config):
-    init_llm(config.llm_base_url, config.llm_api_key, config.llm_model)
 
-    # 运行主要的论文处理流程
+    # 运行主要的论文处理流程（内部会创建并注入 LLM 实例）
     run_summary_flow(config)
 
     if config.enable_feishu_push:

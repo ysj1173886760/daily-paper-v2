@@ -16,6 +16,7 @@ from .deploy_github_node import DeployGitHubNode
 from .fetch_yesterday_papers_node import FetchYesterdayPapersNode
 from .analyze_and_recommend_papers_node import AnalyzeAndRecommendPapersNode
 from .push_daily_report_to_feishu_node import PushDailyReportToFeishuNode
+from .fetch_papers_bulk_node import FetchPapersBulkNode
 
 __all__ = [
     "FetchPapersNode",
@@ -30,4 +31,5 @@ __all__ = [
     "FetchYesterdayPapersNode",
     "AnalyzeAndRecommendPapersNode",
     "PushDailyReportToFeishuNode",
+    "FetchPapersBulkNode",
 ]

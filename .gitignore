@@ -94,4 +94,7 @@ coverage/
 
 data/
 papers/
-config/
+# Ignore only top-level config directory, but keep package configs
+/config/
+!daily_paper/config/
+!daily_paper/config/**

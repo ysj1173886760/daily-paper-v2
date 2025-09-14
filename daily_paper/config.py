@@ -1,5 +1,6 @@
 import yaml
 from pydantic import BaseModel
+from daily_paper.config.arxiv_bulk_config import ArxivBulkConfig
 
 
 class Config(BaseModel):
@@ -8,6 +9,9 @@ class Config(BaseModel):
     arxiv_search_limit: int = 50
 
     meta_file_path: str = "data/test.parquet"
+    
+    # Search mode for fetching arXiv papers: "api" or "bulk"
+    arxiv_search_mode: str = "api"
 
     llm_base_url: str = ""
     llm_api_key: str = ""
@@ -50,6 +54,9 @@ class Config(BaseModel):
     daily_summary_default_start_days_ago: int = 7  # 默认开始处理几天前的数据
     daily_summary_skip_no_paper_dates: bool = True  # 跳过没有论文的日期
     daily_summary_continue_on_push_failure: bool = False # 推送失败时继续处理下一天
+
+    # Bulk arXiv mirror and selection configuration
+    arxiv_bulk: ArxivBulkConfig = ArxivBulkConfig()
 
     @classmethod
     def from_yaml(cls, yaml_path: str):

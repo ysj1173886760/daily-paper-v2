@@ -175,10 +175,13 @@ class BatchDailyReportProcessor:
 if __name__ == "__main__":
     # 测试批量日报处理器
     from daily_paper.utils.data_manager import PaperMetaManager
+    from daily_paper.utils.call_llm import LLM
+    import os
     
-    # 创建测试用的shared数据
+    # 创建测试用的shared数据（需要提供 LLM 实例）
     shared = {
-        "paper_manager": PaperMetaManager("data/papers.parquet")
+        "paper_manager": PaperMetaManager("data/papers.parquet"),
+        "llm": LLM(os.getenv("LLM_BASE_URL", ""), os.getenv("LLM_API_KEY", ""), os.getenv("LLM_MODEL", "")),
     }
     
     # 创建处理器

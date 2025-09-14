@@ -12,6 +12,7 @@ from daily_paper.nodes.push_daily_report_to_feishu_node import PushDailyReportTo
 from daily_paper.utils.logger import logger
 from daily_paper.utils.data_manager import PaperMetaManager
 from daily_paper.utils.date_helper import get_yesterday_date, format_date_chinese
+from daily_paper.utils.call_llm import LLM, AsyncLLM
 
 
 def create_daily_report_flow(target_date: datetime.date = None, recommendation_count: int = 3) -> Flow:
@@ -55,7 +56,10 @@ def create_daily_report_flow(target_date: datetime.date = None, recommendation_c
 def run_daily_report_flow(
     meta_file_path: str,
     target_date: datetime.date = None,
-    recommendation_count: int = 3
+    recommendation_count: int = 3,
+    *,
+    llm: LLM,
+    async_llm: AsyncLLM | None = None,
 ) -> dict:
     """
     运行日报生成流程
@@ -76,7 +80,9 @@ def run_daily_report_flow(
         # 初始化shared store
         shared = {
             "paper_manager": PaperMetaManager(meta_file_path),
-            "target_date": target_date
+            "target_date": target_date,
+            "llm": llm,
+            "async_llm": async_llm,
         }
         
         # 创建并运行流程
@@ -110,10 +116,16 @@ def run_daily_report_with_config(config, target_date: datetime.date = None):
     """
     recommendation_count = getattr(config, "daily_report_recommendation_count", 3)
     
+    # 构建 LLM 实例
+    llm = LLM(config.llm_base_url, config.llm_api_key, config.llm_model)
+    async_llm = AsyncLLM(config.llm_base_url, config.llm_api_key, config.llm_model)
+
     return run_daily_report_flow(
         meta_file_path=config.meta_file_path,
         target_date=target_date,
-        recommendation_count=recommendation_count
+        recommendation_count=recommendation_count,
+        llm=llm,
+        async_llm=async_llm,
     )
 
 

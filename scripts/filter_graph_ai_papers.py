@@ -18,7 +18,7 @@ from tqdm.asyncio import tqdm
 # 添加项目根目录到路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from daily_paper.utils.call_llm import call_llm_with_usage, call_llm_with_usage_async, close_async_client, init_llm
+from daily_paper.utils.call_llm import LLM, AsyncLLM
 
 
 class GraphAIPaperFilter:
@@ -119,11 +119,16 @@ class GraphAIPaperFilter:
             return df
     
     def _init_llm(self):
-        """初始化LLM"""
-        init_llm(
+        """初始化LLM实例"""
+        self.llm = LLM(
             llm_base_url=self.config["llm_base_url"],
             llm_api_key=self.config["llm_api_key"],
-            llm_model=self.config["llm_model"]
+            llm_model=self.config["llm_model"],
+        )
+        self.async_llm = AsyncLLM(
+            llm_base_url=self.config["llm_base_url"],
+            llm_api_key=self.config["llm_api_key"],
+            llm_model=self.config["llm_model"],
         )
     
     def _define_filtering_criteria(self) -> Dict[str, Any]:
@@ -248,7 +253,11 @@ class GraphAIPaperFilter:
                 prompt = self._create_evaluation_prompt(paper)
                 
                 # 异步调用LLM并收集token使用信息
-                response, usage_info = await call_llm_with_usage_async(prompt, temperature=self.config["temperature"])
+                response, usage_info = await self.async_llm.achat(
+                    prompt,
+                    temperature=self.config["temperature"],
+                    return_usage=True,
+                )
                 
                 # 更新token统计（需要同步）
                 self._update_token_stats(usage_info, paper.get("arxiv_id", "unknown"))
@@ -450,7 +459,11 @@ class GraphAIPaperFilter:
             prompt = self._create_evaluation_prompt(paper)
             
             # 调用LLM并收集token使用信息
-            response, usage_info = call_llm_with_usage(prompt, temperature=self.config["temperature"])
+            response, usage_info = self.llm.chat(
+                prompt,
+                temperature=self.config["temperature"],
+                return_usage=True,
+            )
             
             # 更新token统计
             self._update_token_stats(usage_info, paper.get("arxiv_id", "unknown"))
@@ -558,7 +571,7 @@ class GraphAIPaperFilter:
         finally:
             # 确保AsyncClient正确关闭，防止event loop错误
             try:
-                await close_async_client()
+                await self.async_llm.aclose()
             except Exception:
                 pass  # 忽略清理时的异常
 
@@ -1108,7 +1121,11 @@ def main():
         # 最终清理AsyncClient
         try:
             import asyncio
-            asyncio.run(close_async_client())
+            # 清理异步客户端
+            try:
+                asyncio.run(self.async_llm.aclose())
+            except Exception:
+                pass
         except Exception:
             pass  # 忽略清理异常
         

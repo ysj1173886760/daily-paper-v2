@@ -5,14 +5,14 @@ FilterIrrelevantPapersNode - LLM过滤无关论文节点
 from daily_paper.utils.logger import logger
 from pocketflow import Node
 from daily_paper.utils.data_manager import PaperMetaManager
-from daily_paper.utils.call_llm import call_llm
+from daily_paper.utils.call_llm import LLM
 from daily_paper.config import Config
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 import yaml
 
 
-def filter_single_paper(paper_row, user_interested_content):
+def filter_single_paper(paper_row, user_interested_content, llm: LLM):
     """
     过滤单篇论文
     
@@ -52,7 +52,7 @@ reason: |
 """
 
     try:
-        response = call_llm(prompt)
+        response = llm.chat(prompt)
 
         # 提取YAML部分
         yaml_start = response.find("```yaml")
@@ -123,11 +123,16 @@ class FilterIrrelevantPapersNode(Node):
         else:
             logger.info(f"用户感兴趣内容: {self.config.user_interested_content[:100]}...")
 
-        return new_papers, paper_manager
+        # 从 shared 获取 LLM 实例
+        llm: LLM = shared.get("llm")
+        if llm is None:
+            raise RuntimeError("LLM instance not found in shared store. Please set shared['llm'] before running.")
+
+        return new_papers, paper_manager, llm
 
     def exec(self, prep_res):
         """并行使用LLM过滤无关论文"""
-        new_papers, paper_manager = prep_res
+        new_papers, paper_manager, llm = prep_res
 
         if new_papers.empty:
             logger.info("没有需要过滤的新论文")
@@ -142,7 +147,7 @@ class FilterIrrelevantPapersNode(Node):
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = [
                 executor.submit(
-                    filter_single_paper, row, self.config.user_interested_content
+                    filter_single_paper, row, self.config.user_interested_content, llm
                 )
                 for index, row in new_papers.iterrows()
             ]

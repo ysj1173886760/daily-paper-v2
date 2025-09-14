@@ -9,7 +9,7 @@ from typing import List, Dict, Any
 from pocketflow import Node
 from daily_paper.model.arxiv_paper import ArxivPaper
 from daily_paper.utils.logger import logger
-from daily_paper.utils.call_llm import call_llm
+from daily_paper.utils.call_llm import LLM
 from daily_paper.utils.date_helper import format_date_chinese
 
 
@@ -31,6 +31,9 @@ class AnalyzeAndRecommendPapersNode(Node):
         yesterday_papers = shared.get("yesterday_papers", [])
         target_date = shared.get("target_date")
         config = shared.get("config")
+        llm: LLM = shared.get("llm")
+        if llm is None:
+            raise RuntimeError("LLM instance not found in shared store. Please set shared['llm'] before running.")
         
         if not yesterday_papers:
             raise ValueError("yesterday_papers not found in shared store")
@@ -46,7 +49,8 @@ class AnalyzeAndRecommendPapersNode(Node):
         return {
             "papers": yesterday_papers,
             "target_date": target_date,
-            "recommendation_count": recommendation_count
+            "recommendation_count": recommendation_count,
+            "llm": llm,
         }
     
     def exec(self, prep_res):
@@ -54,6 +58,7 @@ class AnalyzeAndRecommendPapersNode(Node):
         papers = prep_res["papers"]
         target_date = prep_res["target_date"]
         recommendation_count = prep_res["recommendation_count"]
+        llm: LLM = prep_res["llm"]
         
         logger.info(f"开始分析 {len(papers)} 篇论文并生成推荐")
         
@@ -75,7 +80,7 @@ class AnalyzeAndRecommendPapersNode(Node):
         
         # 调用LLM
         try:
-            response = call_llm(prompt)
+            response = llm.chat(prompt)
             logger.debug(f"LLM原始响应: {response}")
             
             # 解析LLM响应
