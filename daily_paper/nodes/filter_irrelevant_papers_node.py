@@ -2,33 +2,35 @@
 FilterIrrelevantPapersNode - LLM过滤无关论文节点
 """
 
-from daily_paper.utils.logger import logger
-from pocketflow import Node
-from daily_paper.utils.data_manager import PaperMetaManager
-from daily_paper.utils.call_llm import LLM
-from daily_paper.config import Config
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from tqdm import tqdm
 import yaml
+from tqdm import tqdm
+from pocketflow import Node
+
+from daily_paper.config import Config
+from daily_paper.utils.call_llm import LLM
+from daily_paper.utils.data_manager import PaperMetaManager
+from daily_paper.utils.llm_manager import LLMManager
+from daily_paper.utils.logger import logger
 
 
 def filter_single_paper(paper_row, user_interested_content, llm: LLM):
     """
     过滤单篇论文
-    
+
     Args:
         paper_row: 论文数据行 (pandas Series)
         user_interested_content: 用户感兴趣的内容描述
-        
+
     Returns:
         tuple: (paper_id, filter_result_dict)
     """
     paper_id = paper_row["paper_id"]
     paper_title = paper_row["paper_title"]
     paper_abstract = paper_row["paper_abstract"]
-    
+
     logger.info(f"开始过滤论文: {paper_id}")
-    
+
     # 构建LLM过滤prompt
     prompt = f"""
 请判断以下论文是否与用户感兴趣的内容相关。
@@ -95,7 +97,14 @@ reason: |
 class FilterIrrelevantPapersNode(Node):
     """LLM过滤无关论文节点"""
 
-    def __init__(self, config: Config, max_workers=8, **kwargs):
+    def __init__(
+        self,
+        config: Config,
+        max_workers: int = 8,
+        *,
+        llm_profile: str = "filter",
+        **kwargs,
+    ):
         """
         初始化过滤节点
 
@@ -106,6 +115,7 @@ class FilterIrrelevantPapersNode(Node):
         super().__init__(**kwargs)
         self.config = config
         self.max_workers = max_workers
+        self.llm_profile = llm_profile
 
     def prep(self, shared):
         """从共享存储中读取论文数据"""
@@ -124,9 +134,16 @@ class FilterIrrelevantPapersNode(Node):
             logger.info(f"用户感兴趣内容: {self.config.user_interested_content[:100]}...")
 
         # 从 shared 获取 LLM 实例
-        llm: LLM = shared.get("llm")
+        llm_manager: LLMManager | None = shared.get("llm_manager")
+        if llm_manager is not None:
+            llm = llm_manager.get_llm(self.llm_profile)
+        else:
+            llm = shared.get("llm")
+
         if llm is None:
-            raise RuntimeError("LLM instance not found in shared store. Please set shared['llm'] before running.")
+            raise RuntimeError(
+                "LLM instance not found in shared store. Please set shared['llm'] or shared['llm_manager'] before running."
+            )
 
         return new_papers, paper_manager, llm
 
@@ -201,6 +218,6 @@ class FilterIrrelevantPapersNode(Node):
 
         # 保存过滤结果到共享存储
         shared["filter_results"] = exec_res
-        
+
         logger.info(f"批量更新了{len(exec_res)}篇论文的过滤状态")
         return "default"

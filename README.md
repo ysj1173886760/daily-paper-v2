@@ -36,9 +36,23 @@ llm_base_url: "your-llm-endpoint"
 llm_api_key: "your-api-key"
 llm_model: "your-model"
 
+# （可选）按节点覆盖LLM模型
+llm_profiles:
+  summary:
+    model: "your-summary-model"
+  filter:
+    model: "your-filter-model"
+  analysis:
+    model: "your-analysis-model"
+
+# 未配置的字段会自动回退到 llm_base_url/llm_api_key/llm_model
+# summary/profile 对应默认摘要流程，filter 对应论文过滤，analysis 对应每日汇总与日报
+
 # 分析模板
 analysis_template: "v2"  # 可选: v1, v2, simple, fast_analysis
 ```
+
+> 提示：`llm_profiles` 为可选配置，可为过滤、摘要、每日汇总/日报场景指定独立模型或缓存参数；未覆盖字段会自动回退到全局 `llm_base_url`、`llm_api_key`、`llm_model` 设置。
 
 ### 推送配置
 ```yaml

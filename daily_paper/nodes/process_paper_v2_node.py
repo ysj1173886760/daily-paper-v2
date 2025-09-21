@@ -3,18 +3,21 @@ ProcessPapersV2Node - 论文处理节点（V2版本）
 支持基于模板的论文分析系统
 """
 
-from daily_paper.utils.logger import logger
-import pandas as pd
-from pocketflow import Node
-from daily_paper.model.arxiv_paper import ArxivPaper
-from daily_paper.utils.data_manager import PaperMetaManager
-from daily_paper.utils.pdf_processor import process_paper_pdf
-from daily_paper.utils.call_llm import LLM
-from daily_paper.templates import get_template, PaperAnalysisTemplate
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from tqdm import tqdm
 import json
 import yaml
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import pandas as pd
+from tqdm import tqdm
+from pocketflow import Node
+
+from daily_paper.model.arxiv_paper import ArxivPaper
+from daily_paper.templates import get_template, PaperAnalysisTemplate
+from daily_paper.utils.call_llm import LLM
+from daily_paper.utils.data_manager import PaperMetaManager
+from daily_paper.utils.llm_manager import LLMManager
+from daily_paper.utils.logger import logger
+from daily_paper.utils.pdf_processor import process_paper_pdf
 
 
 def analyze_paper_with_template(
@@ -80,7 +83,14 @@ class ProcessPapersV2Node(Node):
     支持基于模板的论文分析系统
     """
 
-    def __init__(self, template_name="v2", max_workers=16, **kwargs):
+    def __init__(
+        self,
+        template_name: str = "v2",
+        max_workers: int = 16,
+        *,
+        llm_profile: str = "summary",
+        **kwargs,
+    ):
         """
         初始化并行处理节点
 
@@ -92,19 +102,24 @@ class ProcessPapersV2Node(Node):
         super().__init__(**kwargs)
         self.template_name = template_name
         self.max_workers = max_workers
+        self.llm_profile = llm_profile
 
         try:
             template = get_template(template_name)
-            self.summary_generator = lambda paper_text, llm: analyze_paper_with_template(
-                paper_text, template, llm
+            self.summary_generator = (
+                lambda paper_text, llm: analyze_paper_with_template(
+                    paper_text, template, llm
+                )
             )
             logger.info(f"使用模板: {template_name} ({template.description})")
         except ValueError as e:
             logger.error(f"模板错误: {e}")
             # 回退到默认V2模板
             template = get_template("v2")
-            self.summary_generator = lambda paper_text, llm: analyze_paper_with_template(
-                paper_text, template, llm
+            self.summary_generator = (
+                lambda paper_text, llm: analyze_paper_with_template(
+                    paper_text, template, llm
+                )
             )
             logger.warning("回退到默认V2模板")
 
@@ -119,7 +134,7 @@ class ProcessPapersV2Node(Node):
             all_papers["filtered_out"] = all_papers["filtered_out"].fillna(False)
         else:
             all_papers["filtered_out"] = False
-        
+
         papers_without_summary = all_papers.loc[
             (all_papers["summary"].isna()) & (~all_papers["filtered_out"])
         ]
@@ -147,9 +162,17 @@ class ProcessPapersV2Node(Node):
         else:
             logger.info(f"使用摘要生成器: {self.summary_generator.__name__}")
         # 从 shared 获取 LLM 实例
-        llm: LLM = shared.get("llm")
+        llm_manager: LLMManager | None = shared.get("llm_manager")
+        if llm_manager is not None:
+            llm = llm_manager.get_llm(self.llm_profile)
+        else:
+            llm = shared.get("llm")
+
         if llm is None:
-            raise RuntimeError("LLM instance not found in shared store. Please set shared['llm'] before running.")
+            raise RuntimeError(
+                "LLM instance not found in shared store. Please set shared['llm'] or shared['llm_manager'] before running."
+            )
+
         return papers, llm
 
     def exec(self, prep_res):
@@ -164,7 +187,10 @@ class ProcessPapersV2Node(Node):
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = [
                 executor.submit(
-                    process_single_paper_with_generator, paper, self.summary_generator, llm
+                    process_single_paper_with_generator,
+                    paper,
+                    self.summary_generator,
+                    llm,
                 )
                 for paper in papers
             ]
